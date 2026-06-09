@@ -11,10 +11,20 @@ gitops/
 │   ├── openldap.yaml          # Helm chart (external repo) + inlined values
 │   ├── phpldapadmin.yaml      # -> manifests/phpldapadmin
 │   └── keycloak.yaml          # -> manifests/keycloak
-└── manifests/
-    ├── phpldapadmin/          # Deployment + Service + Ingress
-    └── keycloak/              # Secret + Deployment + Service + Ingress
+├── manifests/
+│   ├── phpldapadmin/          # Deployment + Service + Ingress
+│   └── keycloak/              # Secret + Deployment + Service + Ingress
+└── docs/                      # step-by-step guides for the whole lab
 ```
+
+## Documentation
+
+Full walkthroughs in [`docs/`](docs/):
+
+- [openldap-minikube-guide.md](docs/openldap-minikube-guide.md) — install OpenLDAP + phpLDAPadmin
+- [keycloak-minikube-guide.md](docs/keycloak-minikube-guide.md) — install Keycloak
+- [keycloak-openldap-federation-guide.md](docs/keycloak-openldap-federation-guide.md) — federate Keycloak to OpenLDAP (+ `keycloak-ldap-federation.sh`)
+- [argocd-gitops-guide.md](docs/argocd-gitops-guide.md) — this GitOps setup, adoption, and the `imagePullSecrets` gotcha
 
 ## Scope
 
