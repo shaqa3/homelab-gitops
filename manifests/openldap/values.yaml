@@ -1,0 +1,47 @@
+# Helm values for the openldap chart (helm-openldap/openldap 2.0.4).
+# Consumed by apps/openldap.yaml via an ArgoCD multi-source valueFiles ref.
+# See ../../README.md ("OpenLDAP values explained") for what each block does.
+
+replicaCount: 1
+
+image:
+  repository: osixia/openldap
+  tag: 1.5.0
+  pullPolicy: IfNotPresent
+  # MUST be a non-empty NAME. The chart always renders an imagePullSecrets entry
+  # from this; an empty string yields a null-named entry that breaks ArgoCD's
+  # diff and makes self-heal append empty entries forever. The secret need not
+  # exist — the public image pulls anonymously. See README troubleshooting.
+  pullSecret: "no-pull-secret"
+
+# Single-node lab: no replication.
+replication:
+  enabled: false
+
+# Plain LDAP on 389 (no TLS) to keep local testing simple.
+tls:
+  enabled: false
+env:
+  LDAP_ORGANISATION: "Example Inc."
+  LDAP_DOMAIN: "example.org"      # -> base DN dc=example,dc=org
+  LDAP_TLS: "false"
+  LDAP_BACKEND: "mdb"
+
+adminPassword: admin              # cn=admin,dc=example,dc=org
+configPassword: config            # cn=admin,cn=config
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+# Disable the bundled UIs: ltb-passwd and phpldapadmin ship a deprecated
+# Ingress apiVersion. phpLDAPadmin is deployed separately (manifests/phpldapadmin).
+ltb-passwd:
+  enabled: false
+phpldapadmin:
+  enabled: false
+
+service:
+  type: ClusterIP
+  ldapPort: 389
+  sslLdapPort: 636

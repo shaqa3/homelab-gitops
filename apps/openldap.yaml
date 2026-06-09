@@ -7,49 +7,20 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  # OpenLDAP is installed straight from the upstream Helm chart repo,
-  # with our minikube values inlined here (no chart vendored into Git).
-  source:
-    repoURL: https://jp-gouin.github.io/helm-openldap/
-    chart: openldap
-    targetRevision: 2.0.4
-    helm:
-      releaseName: openldap
-      values: |
-        replicaCount: 1
-        image:
-          repository: osixia/openldap
-          tag: 1.5.0
-          pullPolicy: IfNotPresent
-          # The chart ALWAYS renders an imagePullSecrets entry from this value.
-          # An empty string yields a null-named entry that breaks ArgoCD's diff
-          # (declared merge key "name") AND makes self-heal append duplicates
-          # endlessly. A placeholder NAME renders a stable, mergeable entry;
-          # the secret need not exist — the public osixia image pulls anonymously
-          # (and with IfNotPresent the cached image isn't re-pulled anyway).
-          pullSecret: "no-pull-secret"
-        replication:
-          enabled: false
-        tls:
-          enabled: false
-        env:
-          LDAP_ORGANISATION: "Example Inc."
-          LDAP_DOMAIN: "example.org"
-          LDAP_TLS: "false"
-          LDAP_BACKEND: "mdb"
-        adminPassword: admin
-        configPassword: config
-        persistence:
-          enabled: true
-          size: 1Gi
-        ltb-passwd:
-          enabled: false
-        phpldapadmin:
-          enabled: false
-        service:
-          type: ClusterIP
-          ldapPort: 389
-          sslLdapPort: 636
+  # Multi-source: the chart comes from the upstream Helm repo, while its values
+  # live in THIS Git repo (manifests/openldap/values.yaml). The second source is
+  # reference-only (ref: values) and exposes the repo as $values to the first.
+  sources:
+    - repoURL: https://jp-gouin.github.io/helm-openldap/
+      chart: openldap
+      targetRevision: 2.0.4
+      helm:
+        releaseName: openldap
+        valueFiles:
+          - $values/manifests/openldap/values.yaml
+    - repoURL: https://github.com/shaqa3/homelab-gitops.git
+      targetRevision: HEAD
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: openldap
