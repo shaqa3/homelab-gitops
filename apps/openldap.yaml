@@ -53,3 +53,7 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # The chart renders an empty-named imagePullSecrets entry (pullSecret: ""),
+      # which breaks ArgoCD's client-side three-way-merge diff
+      # ("does not contain declared merge key: name"). Server-side apply avoids it.
+      - ServerSideApply=true
