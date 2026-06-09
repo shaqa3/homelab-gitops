@@ -62,3 +62,6 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # Apply server-side: avoids the client-side three-way-merge patch that
+      # fails on the chart's null-named imagePullSecrets entry during sync.
+      - ServerSideApply=true
