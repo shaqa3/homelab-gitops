@@ -21,7 +21,13 @@ spec:
           repository: osixia/openldap
           tag: 1.5.0
           pullPolicy: IfNotPresent
-          pullSecret: ""
+          # The chart ALWAYS renders an imagePullSecrets entry from this value.
+          # An empty string yields a null-named entry that breaks ArgoCD's diff
+          # (declared merge key "name") AND makes self-heal append duplicates
+          # endlessly. A placeholder NAME renders a stable, mergeable entry;
+          # the secret need not exist — the public osixia image pulls anonymously
+          # (and with IfNotPresent the cached image isn't re-pulled anyway).
+          pullSecret: "no-pull-secret"
         replication:
           enabled: false
         tls:
@@ -47,21 +53,9 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: openldap
-  # The chart renders an empty-named imagePullSecrets entry (from pullSecret: ""),
-  # which breaks ArgoCD's three-way-merge diff with
-  # "does not contain declared merge key: name". We don't need to manage that
-  # field (anonymous pull of the public osixia image), so ignore it in diffs.
-  ignoreDifferences:
-    - group: apps
-      kind: StatefulSet
-      jsonPointers:
-        - /spec/template/spec/imagePullSecrets
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      # Apply server-side: avoids the client-side three-way-merge patch that
-      # fails on the chart's null-named imagePullSecrets entry during sync.
-      - ServerSideApply=true
