@@ -47,13 +47,18 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: openldap
+  # The chart renders an empty-named imagePullSecrets entry (from pullSecret: ""),
+  # which breaks ArgoCD's three-way-merge diff with
+  # "does not contain declared merge key: name". We don't need to manage that
+  # field (anonymous pull of the public osixia image), so ignore it in diffs.
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/template/spec/imagePullSecrets
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      # The chart renders an empty-named imagePullSecrets entry (pullSecret: ""),
-      # which breaks ArgoCD's client-side three-way-merge diff
-      # ("does not contain declared merge key: name"). Server-side apply avoids it.
-      - ServerSideApply=true
