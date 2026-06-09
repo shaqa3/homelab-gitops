@@ -10,7 +10,7 @@ spec:
   # App-of-apps: this single Application watches apps/ and creates the
   # child Applications (openldap, phpldapadmin, keycloak).
   source:
-    repoURL: __REPO_URL__
+    repoURL: https://github.com/shaqa3/homelab-gitops.git
     targetRevision: HEAD
     path: apps
   destination:

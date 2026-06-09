@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: __REPO_URL__
+    repoURL: https://github.com/shaqa3/homelab-gitops.git
     targetRevision: HEAD
     path: manifests/keycloak
   destination:

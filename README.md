@@ -26,8 +26,9 @@ gitops/
 
 ## Bootstrap
 
-1. Push this repo to your Git remote and set the URL in the Application manifests
-   (replace every `__REPO_URL__`). The `openldap` app uses the upstream Helm repo
+1. Push this repo to your Git remote
+   (`https://github.com/shaqa3/homelab-gitops.git`). The child Application
+   manifests already point at it; the `openldap` app uses the upstream Helm repo
    and needs no change.
 2. Apply the root app once:
 
