@@ -174,6 +174,13 @@ import/sync/pagination flags. This is realm-level config (not per-user), read
 from `/components?type=…UserStorageProvider` (needs `view-realm`). The bind
 credential is write-only and never returned by Keycloak.
 
+A **Synchronisation** section adds **Sync all users** (full) and **Sync changed
+users** (incremental) buttons — `POST
+/user-storage/{id}/sync?action=triggerFullSync|triggerChangedUsersSync` (needs
+`manage-users`) — and shows the resulting added/updated/removed/failed counts.
+The config itself is read-only: editing connection/bind settings stays with the
+Keycloak Admin Console, not this SPA.
+
 ## Upgrade to a real Vite project (optional)
 
 This CDN/Babel setup is for zero-install simplicity (no Node needed). For a
