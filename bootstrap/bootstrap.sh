@@ -16,15 +16,14 @@ c() { curl -s --cacert "$CA" "$@"; }
 say() { printf '\n=== %s ===\n' "$*"; }
 
 # ---------------------------------------------------------------------------
-say "1. TLS — mkcert CA + cert + secrets in each namespace"
-mkcert -install || true   # trusts the local CA (idempotent; may prompt for password)
-CRT=/tmp/homelab.pem KEY=/tmp/homelab-key.pem
-mkcert -cert-file "$CRT" -key-file "$KEY" \
-  "react.${IP}.nip.io" "keycloak.${IP}.nip.io" "phpldapadmin.${IP}.nip.io"
-for ns in react-app keycloak openldap; do
-  kubectl -n "$ns" create secret tls homelab-tls --cert="$CRT" --key="$KEY" \
-    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-done
+say "1. TLS — provisioned by cert-manager (declarative, in Git)"
+# The homelab-tls secrets are issued by cert-manager (manifests/cert-manager-issuers).
+# The only manual step is trusting the CA in your browser/system once:
+#   kubectl -n cert-manager get secret homelab-ca-key-pair \
+#     -o jsonpath='{.data.tls\.crt}' | base64 -d > homelab-ca.crt
+#   # macOS: sudo security add-trusted-cert -d -r trustRoot \
+#   #          -k /Library/Keychains/System.keychain homelab-ca.crt
+echo "  (cert-manager issues homelab-tls; trust the CA once — see comment above)"
 
 # ---------------------------------------------------------------------------
 say "2. LDAP seed — users (ou=people) + groups (ou=groups)"

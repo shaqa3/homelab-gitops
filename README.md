@@ -13,8 +13,11 @@ gitops/
 │   ├── phpldapadmin.yaml      # -> manifests/phpldapadmin
 │   ├── keycloak.yaml          # -> manifests/keycloak (ingress only)
 │   ├── keycloak-operator.yaml # -> manifests/keycloak-operator
-│   ├── keycloak-cr.yaml       # -> manifests/keycloak-cr
+│   ├── keycloak-cr.yaml       # -> manifests/keycloak-cr (incl. keycloak-db SealedSecret)
 │   ├── metrics-server.yaml    # -> manifests/metrics-server
+│   ├── sealed-secrets.yaml    # -> manifests/sealed-secrets (controller)
+│   ├── cert-manager.yaml      # -> manifests/cert-manager (controller)
+│   ├── cert-manager-issuers.yaml # -> manifests/cert-manager-issuers (CA + leaf certs)
 │   └── react-app.yaml         # -> manifests/react-app
 ├── manifests/
 │   ├── openldap/             # values.yaml for the Helm chart (no raw objects)
@@ -137,29 +140,34 @@ themselves re-import from OpenLDAP automatically.
 > job. The operator generates an initial admin in the `kc-initial-admin` secret;
 > the lab's permanent `admin/admin` was created on top of that.
 
-## TLS / HTTPS
+## TLS / HTTPS (cert-manager) & secrets (Sealed Secrets)
 
-The ingresses serve HTTPS using an [mkcert](https://github.com/FiloSottile/mkcert)
-certificate (SANs for the `react`, `keycloak`, and `phpldapadmin` nip.io hosts),
-stored as a `kubernetes.io/tls` secret named **`homelab-tls`** in each namespace.
-That secret is **created out-of-band, not in Git** (it holds a private key):
+**TLS is issued by cert-manager** — a self-signed root → a `homelab-ca`
+`ClusterIssuer` → one leaf `Certificate` per namespace, each producing the
+`kubernetes.io/tls` secret **`homelab-tls`** the Ingresses reference
+(`manifests/cert-manager` + `manifests/cert-manager-issuers`). It's declarative
+and auto-renewing — no out-of-band mkcert step. The only manual bit is trusting
+the CA once (same as any self-signed CA):
 
 ```bash
-mkcert -install   # once, trusts the local CA in your system/browser
-mkcert react.192.168.64.3.nip.io keycloak.192.168.64.3.nip.io phpldapadmin.192.168.64.3.nip.io
-for ns in react-app keycloak openldap; do
-  kubectl -n $ns create secret tls homelab-tls \
-    --cert=react.192.168.64.3.nip.io+2.pem --key=react.192.168.64.3.nip.io+2-key.pem \
-    --dry-run=client -o yaml | kubectl apply -f -
-done
+kubectl -n cert-manager get secret homelab-ca-key-pair \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d > homelab-ca.crt
+# macOS: sudo security add-trusted-cert -d -r trustRoot \
+#          -k /Library/Keychains/System.keychain homelab-ca.crt
 ```
 
-- The Ingress manifests (in Git) reference `homelab-tls` via their `tls:` block.
 - **react-app** forces HTTPS (PKCE needs a secure context). **keycloak** sets
-  `ssl-redirect: "false"` so HTTP stays usable for CLI tooling that posts to
-  `http://keycloak/.../token`; the browser app uses `https://keycloak` explicitly.
-- For real TLS without the manual secret, install **cert-manager** with a
-  (self-signed or CA) `ClusterIssuer` and add `Certificate` resources to Git.
+  `ssl-redirect: "false"` so HTTP stays usable for CLI tooling; the browser app
+  uses `https://keycloak` explicitly.
+
+**Secrets** are encrypted in Git with **Sealed Secrets**: the controller
+(`manifests/sealed-secrets`) decrypts `keycloak-db`
+(`manifests/keycloak-cr/db-sealedsecret.yaml`) into a real Secret in-cluster. Seal
+new secrets with `kubeseal --controller-namespace kube-system`. Caveat: the
+controller's private key decrypts everything — back it up, or the committed
+SealedSecrets are unrecoverable after a cluster rebuild (see the rebuild runbook).
+The LDAP `bindCredential` stays inline in the realm-import CR (no secretRef to
+seal); it's the lab LDAP admin password.
 
 ## Notes
 
