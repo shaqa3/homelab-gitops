@@ -13,8 +13,6 @@ spec:
     repoURL: https://github.com/shaqa3/homelab-gitops.git
     targetRevision: HEAD
     path: manifests/keycloak-operator
-    directory:
-      recurse: false
   destination:
     server: https://kubernetes.default.svc
     namespace: keycloak
