@@ -89,6 +89,10 @@ metadata:
   namespace: keycloak
   annotations:
     nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    # Keep HTTP usable (no forced 308) so CLI tooling that posts to
+    # http://keycloak/.../token keeps working. The browser app uses HTTPS
+    # explicitly (KC_CONFIG.url), so the interactive flow is still TLS.
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx
   tls:
