@@ -206,6 +206,11 @@
         headers: { Authorization: `Bearer ${keycloak.token}`, ...(opts.headers || {}) },
       });
     }
+    // LDAP generalized time "YYYYMMDDHHMMSSZ" -> readable UTC
+    function fmtLdapTime(s) {
+      const m = s && /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(s);
+      return m ? `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]} UTC` : (s || null);
+    }
 
     function Users() {
       const [state, setState] = useState({ loading: true, users: null, error: null });
@@ -381,6 +386,27 @@
         })();
       }, [user.id]);
 
+      // ---- LDAP directory entry (federated users) ----
+      const [ldap, setLdap] = useState(undefined); // undefined=loading, null=not federated, object=data
+      useEffect(() => {
+        (async () => {
+          try {
+            const res = await adminFetch(`/users/${user.id}`); // full rep incl. attributes
+            const full = res.ok ? await res.json() : {};
+            if (!full.federationLink) { setLdap(null); return; }
+            const a = full.attributes || {};
+            const first = (k) => (a[k] && a[k][0]) || null;
+            let provider = 'LDAP';
+            try {
+              const cs = await adminFetch('/components?type=org.keycloak.storage.UserStorageProvider');
+              if (cs.ok) { const m = (await cs.json()).find((c) => c.id === full.federationLink); if (m) provider = m.name; }
+            } catch {}
+            setLdap({ provider, dn: first('LDAP_ENTRY_DN'), id: first('LDAP_ID'),
+              created: fmtLdapTime(first('createTimestamp')), modified: fmtLdapTime(first('modifyTimestamp')) });
+          } catch { setLdap(null); }
+        })();
+      }, [user.id]);
+
       const toggleRole = async (role) => {
         const has = assigned.has(role.name);
         try {
@@ -447,6 +473,21 @@
             <span className={'tag ' + (user.federationLink ? 'fed' : 'local')}
               style={{ marginLeft: '.5rem' }}>{user.federationLink ? 'LDAP' : 'local'}</span>
           </div>
+
+          {ldap && (
+            <div style={{ gridColumn: '1 / -1', background: 'var(--input-bg)',
+              border: '1px solid var(--border)', borderRadius: '8px', padding: '.6rem .8rem' }}>
+              <div className="muted" style={{ fontSize: '.8rem', marginBottom: '.4rem' }}>
+                LDAP directory entry <span style={{ opacity: .8 }}>(provider: {ldap.provider}, read-only)</span>
+              </div>
+              <div className="kv" style={{ marginTop: 0, fontSize: '.82rem', gridTemplateColumns: 'auto 1fr' }}>
+                <b>DN</b><span style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>{ldap.dn || '—'}</span>
+                <b>entryUUID</b><span style={{ fontFamily: 'monospace' }}>{ldap.id || '—'}</span>
+                <b>Created</b><span>{ldap.created || '—'}</span>
+                <b>Modified</b><span>{ldap.modified || '—'}</span>
+              </div>
+            </div>
+          )}
           <input className="inp" placeholder="first name" value={form.firstName} onChange={set('firstName')} />
           <input className="inp" placeholder="last name" value={form.lastName} onChange={set('lastName')} />
           <input className="inp" style={{ gridColumn: '1 / -1' }} placeholder="email" type="email" value={form.email} onChange={set('email')} />
