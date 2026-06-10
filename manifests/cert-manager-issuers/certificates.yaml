@@ -1,0 +1,40 @@
+# One leaf Certificate per app namespace; each produces the `homelab-tls` secret
+# the matching Ingress already references.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: react-tls
+  namespace: react-app
+spec:
+  secretName: homelab-tls
+  dnsNames:
+    - react.192.168.64.3.nip.io
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: keycloak-tls
+  namespace: keycloak
+spec:
+  secretName: homelab-tls
+  dnsNames:
+    - keycloak.192.168.64.3.nip.io
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: phpldapadmin-tls
+  namespace: openldap
+spec:
+  secretName: homelab-tls
+  dnsNames:
+    - phpldapadmin.192.168.64.3.nip.io
+  issuerRef:
+    name: homelab-ca
+    kind: ClusterIssuer

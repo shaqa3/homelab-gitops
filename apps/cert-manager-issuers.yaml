@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-issuers
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"   # after cert-manager (wave -2), before apps
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shaqa3/homelab-gitops.git
+    targetRevision: HEAD
+    path: manifests/cert-manager-issuers
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    # The leaf Certs/CA depend on cert-manager CRDs + webhook being ready;
+    # retry handles the initial ordering.
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 2m
