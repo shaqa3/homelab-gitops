@@ -536,6 +536,8 @@
 
     function LdapSettings() {
       const [state, setState] = useState({ loading: true, prov: null, error: null });
+      const [sync, setSync] = useState(null);     // { ok, text }
+      const [syncing, setSyncing] = useState(false);
       useEffect(() => {
         (async () => {
           try {
@@ -548,6 +550,18 @@
           } catch (e) { setState({ loading: false, prov: null, error: e.message }); }
         })();
       }, []);
+
+      const doSync = async (action, label) => {
+        setSyncing(true); setSync(null);
+        try {
+          const res = await adminFetch(`/user-storage/${state.prov.id}/sync?action=${action}`, { method: 'POST' });
+          if (res.status === 403) { setSync({ ok: false, text: "Need the 'manage-users' role to sync." }); return; }
+          if (!res.ok) { setSync({ ok: false, text: `${label} failed: HTTP ${res.status}` }); return; }
+          const r = await res.json();
+          setSync({ ok: true, text: `${label}: added ${r.added}, updated ${r.updated}, removed ${r.removed}, failed ${r.failed}.` });
+        } catch (e) { setSync({ ok: false, text: e.message }); }
+        finally { setSyncing(false); }
+      };
 
       if (state.loading) return <div><h1>LDAP federation</h1><p className="muted">Loading…</p></div>;
       if (state.error)   return <div><h1>LDAP federation</h1><div className="err">{state.error}</div></div>;
@@ -587,6 +601,27 @@
               </React.Fragment>
             ))}
           </div>
+
+          <div className="muted" style={{ fontSize: '.82rem', marginTop: '1.25rem', marginBottom: '.4rem' }}>
+            Synchronisation
+          </div>
+          <div className="row" style={{ marginTop: 0 }}>
+            <button className="primary" disabled={syncing}
+              onClick={() => doSync('triggerFullSync', 'Full sync')}>
+              {syncing ? 'Syncing…' : 'Sync all users'}
+            </button>
+            <button className="ghost" disabled={syncing}
+              onClick={() => doSync('triggerChangedUsersSync', 'Changed-users sync')}>
+              Sync changed users
+            </button>
+          </div>
+          {sync && <div className={sync.ok ? '' : 'err'}
+            style={{ marginTop: '.75rem', fontSize: '.86rem', color: sync.ok ? 'var(--ok)' : undefined }}>
+            {sync.text}</div>}
+          <p className="muted" style={{ fontSize: '.78rem', marginTop: '.6rem' }}>
+            Pulls users from LDAP into Keycloak in bulk (needs <code>manage-users</code>). New
+            LDAP users also import automatically on first login/lookup.
+          </p>
         </div>
       );
     }
