@@ -75,6 +75,8 @@
     .tag.fed { background: var(--tag-fed-bg); color: var(--tag-fed-text); }
     .tag.local { background: var(--tag-local-bg); color: var(--tag-local-text); }
     .tag.role { background: var(--pill-bg); color: var(--pill-text); }
+    .tag.inherited { background: transparent; color: var(--accent);
+                     border: 1px dashed var(--accent); }
     .err { background: var(--err-bg); color: var(--err-text); padding: .75rem 1rem;
            border-radius: 8px; margin-top: 1rem; font-size: .88rem; }
     .inp { padding: .5rem .6rem; border-radius: 7px; border: 1px solid var(--border);
@@ -234,13 +236,20 @@
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const users = await res.json();
           users.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
-          // fetch each user's realm roles in parallel (small lab — N is tiny)
+          // fetch each user's EFFECTIVE realm roles (direct + group-inherited) in parallel.
+          // A role is "inherited" if it's in the composite mapping but not the direct one.
+          const HIDE = new Set(['default-roles-demo', 'offline_access', 'uma_authorization']);
           await Promise.all(users.map(async (u) => {
             try {
-              const r = await adminFetch(`/users/${u.id}/role-mappings/realm`);
-              u.realmRoles = r.ok
-                ? (await r.json()).map((x) => x.name).filter((n) => n !== 'default-roles-demo').sort()
-                : null; // null = couldn't read (e.g. missing permission)
+              const [dr, cr] = await Promise.all([
+                adminFetch(`/users/${u.id}/role-mappings/realm`),
+                adminFetch(`/users/${u.id}/role-mappings/realm/composite`),
+              ]);
+              if (!cr.ok) { u.realmRoles = null; return; } // null = couldn't read
+              const direct = new Set(dr.ok ? (await dr.json()).map((x) => x.name) : []);
+              u.realmRoles = (await cr.json()).map((x) => x.name)
+                .filter((n) => !HIDE.has(n)).sort()
+                .map((name) => ({ name, inherited: !direct.has(name) }));
             } catch { u.realmRoles = null; }
           }));
           setState({ loading: false, users, error: null });
@@ -255,12 +264,14 @@
         <div>
           <h1>Users <span className="muted" style={{ fontSize: '.9rem', fontWeight: 400 }}>
             in realm <code>demo</code></span></h1>
-          <p className="muted">Fetched live from the Keycloak Admin API with your access token.</p>
+          <p className="muted">Fetched live from the Keycloak Admin API with your access token.
+            Roles are <b>effective</b> — solid = directly assigned,
+            <span className="tag inherited" style={{ margin: '0 .2rem' }}>dashed</span> = inherited from a group.</p>
           {state.loading && <p className="muted">Loading…</p>}
           {state.error && <div className="err">{state.error}</div>}
           {state.users && (
             <table>
-              <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Source</th><th>Status</th><th>Roles</th><th></th></tr></thead>
+              <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Source</th><th>Status</th><th>Roles (effective)</th><th></th></tr></thead>
               <tbody>
                 {state.users.map((u) => (
                   <tr key={u.id}>
@@ -274,7 +285,9 @@
                       {u.realmRoles === null ? <span className="muted">—</span>
                         : u.realmRoles.length === 0 ? <span className="muted">—</span>
                         : <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '.25rem' }}>
-                            {u.realmRoles.map((r) => <span key={r} className="tag role">{r}</span>)}
+                            {u.realmRoles.map((r) => <span key={r.name}
+                              className={'tag ' + (r.inherited ? 'inherited' : 'role')}
+                              title={r.inherited ? 'inherited from a group' : 'directly assigned'}>{r.name}</span>)}
                           </span>}
                     </td>
                     <td><button className="ghost rowbtn"
