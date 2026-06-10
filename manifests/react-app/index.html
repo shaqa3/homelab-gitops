@@ -82,6 +82,7 @@
                background: var(--form-bg); padding: 1rem; border-radius: 10px; }
     .theme-btn { padding: .35rem .7rem; font-size: .85rem; }
     .rowbtn { padding: .25rem .6rem; font-size: .78rem; font-weight: 500; }
+    .danger { background: #b91c1c; color: #fff; }
   </style>
 
   <!-- React (UMD globals) + Babel for in-browser JSX -->
@@ -318,13 +319,16 @@
           <input className="inp" placeholder="password *" type="password" required value={form.password} onChange={set('password')} />
           <input className="inp" placeholder="first name" value={form.firstName} onChange={set('firstName')} />
           <input className="inp" placeholder="last name" value={form.lastName} onChange={set('lastName')} />
-          <input className="inp" style={{ gridColumn: '1 / -1' }} placeholder="email" type="email" value={form.email} onChange={set('email')} />
+          <input className="inp" style={{ gridColumn: '1 / -1' }} placeholder="email *" type="email" required value={form.email} onChange={set('email')} />
           {msg && <div style={{ gridColumn: '1 / -1', fontSize: '.85rem',
             color: msg.ok ? 'var(--ok)' : 'var(--err-text)' }}>{msg.text}</div>}
           <div style={{ gridColumn: '1 / -1' }}>
             <button className="primary" type="submit" disabled={busy}>
               {busy ? 'Creating…' : 'Create user'}
             </button>
+            <span className="muted" style={{ fontSize: '.78rem', marginLeft: '.6rem' }}>
+              email required — Keycloak marks users without it "not fully set up"
+            </span>
           </div>
         </form>
       );
@@ -333,7 +337,7 @@
     function EditUser({ user, onDone, onCancel }) {
       const [form, setForm] = useState({
         firstName: user.firstName || '', lastName: user.lastName || '',
-        email: user.email || '', enabled: !!user.enabled,
+        email: user.email || '', enabled: !!user.enabled, newPassword: '',
       });
       const [msg, setMsg] = useState(null);
       const [busy, setBusy] = useState(false);
@@ -353,18 +357,35 @@
               enabled: form.enabled,
             }),
           });
-          if (res.status === 204) {
-            setMsg({ ok: true, text: 'Saved (also written to LDAP for federated users).' });
-            setTimeout(onDone, 800);
-          } else if (res.status === 403) {
-            setMsg({ ok: false, text: "You don't have the 'manage-users' permission." });
-          } else {
-            const t = await res.text();
-            setMsg({ ok: false, text: `HTTP ${res.status}: ${t.slice(0, 160)}` });
+          if (res.status === 403) { setMsg({ ok: false, text: "You don't have the 'manage-users' permission." }); return; }
+          if (res.status !== 204) { setMsg({ ok: false, text: `HTTP ${res.status}: ${(await res.text()).slice(0,160)}` }); return; }
+
+          // optional password reset
+          if (form.newPassword) {
+            const pr = await adminFetch(`/users/${user.id}/reset-password`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'password', value: form.newPassword, temporary: false }),
+            });
+            if (pr.status !== 204) { setMsg({ ok: false, text: `Profile saved, but password reset failed (HTTP ${pr.status}).` }); return; }
           }
+          setMsg({ ok: true, text: 'Saved' + (form.newPassword ? ' (incl. new password)' : '') + ' — written through to LDAP.' });
+          setTimeout(onDone, 800);
         } catch (e) {
           setMsg({ ok: false, text: e.message });
         } finally { setBusy(false); }
+      };
+
+      const del = async () => {
+        if (!window.confirm(`Delete user "${user.username}"? For a federated user this also removes it from LDAP.`)) return;
+        setBusy(true); setMsg(null);
+        try {
+          const res = await adminFetch(`/users/${user.id}`, { method: 'DELETE' });
+          if (res.status === 204) { setMsg({ ok: true, text: 'Deleted.' }); setTimeout(onDone, 600); }
+          else if (res.status === 403) setMsg({ ok: false, text: "You don't have the 'manage-users' permission." });
+          else setMsg({ ok: false, text: `Delete failed: HTTP ${res.status}` });
+        } catch (e) { setMsg({ ok: false, text: e.message }); }
+        finally { setBusy(false); }
       };
 
       return (
@@ -377,6 +398,8 @@
           <input className="inp" placeholder="first name" value={form.firstName} onChange={set('firstName')} />
           <input className="inp" placeholder="last name" value={form.lastName} onChange={set('lastName')} />
           <input className="inp" style={{ gridColumn: '1 / -1' }} placeholder="email" type="email" value={form.email} onChange={set('email')} />
+          <input className="inp" style={{ gridColumn: '1 / -1' }} type="password" autoComplete="new-password"
+            placeholder="new password (leave blank to keep)" value={form.newPassword} onChange={set('newPassword')} />
           <label style={{ gridColumn: '1 / -1', display: 'flex', gap: '.5rem', alignItems: 'center',
             fontSize: '.9rem', color: 'var(--muted)' }}>
             <input type="checkbox" checked={form.enabled}
@@ -385,11 +408,13 @@
           </label>
           {msg && <div style={{ gridColumn: '1 / -1', fontSize: '.85rem',
             color: msg.ok ? 'var(--ok)' : 'var(--err-text)' }}>{msg.text}</div>}
-          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '.5rem' }}>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '.5rem', alignItems: 'center' }}>
             <button className="primary" type="submit" disabled={busy}>
               {busy ? 'Saving…' : 'Save changes'}
             </button>
             <button className="ghost" type="button" onClick={onCancel}>Cancel</button>
+            <span style={{ marginLeft: 'auto' }} />
+            <button className="danger" type="button" onClick={del} disabled={busy}>Delete user</button>
           </div>
         </form>
       );
