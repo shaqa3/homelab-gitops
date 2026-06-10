@@ -249,6 +249,42 @@ user → **Delete**.
 
 ---
 
+## Group federation (optional)
+
+LDAP groups can federate into Keycloak too. Create a `groups` OU with
+`groupOfNames` entries (each needs ≥1 `member` DN):
+
+```bash
+cat > groups.ldif <<'EOF'
+dn: ou=groups,dc=example,dc=org
+objectClass: organizationalUnit
+ou: groups
+
+dn: cn=admins,ou=groups,dc=example,dc=org
+objectClass: groupOfNames
+cn: admins
+member: uid=jdoe,ou=people,dc=example,dc=org
+
+dn: cn=developers,ou=groups,dc=example,dc=org
+objectClass: groupOfNames
+cn: developers
+member: uid=asmith,ou=people,dc=example,dc=org
+member: uid=jdoe,ou=people,dc=example,dc=org
+EOF
+kubectl -n openldap cp groups.ldif openldap-0:/tmp/groups.ldif
+kubectl -n openldap exec openldap-0 -- ldapadd -x -H ldap://localhost:389 \
+  -D "cn=admin,dc=example,dc=org" -w admin -f /tmp/groups.ldif
+```
+
+Then add a **`group-ldap-mapper`** sub-component to the LDAP provider (key config:
+`groups.dn=ou=groups,…`, `group.object.classes=groupOfNames`,
+`membership.ldap.attribute=member`, `membership.attribute.type=DN`,
+`membership.user.ldap.attribute=uid`, `mode=READ_ONLY`). In GitOps this lives in
+`manifests/keycloak-cr/realmimport.yaml` under the provider's `subComponents`.
+Sync it (`…/user-storage/{ldapId}/mappers/{mapperId}/sync?direction=fedToKeycloak`)
+and the groups appear in Keycloak with their LDAP membership — visible in the
+React app's **Groups** tab. Membership stays managed in LDAP (READ_ONLY).
+
 ## How it works
 
 - **Import vs. bind.** With `importEnabled=true`, Keycloak copies a lightweight

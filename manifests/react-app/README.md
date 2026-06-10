@@ -181,6 +181,14 @@ provider name is resolved from `federationLink` via
 > origins** include the app's origin, so the access token carries an
 > `allowed-origins` claim and Keycloak returns CORS headers for it.
 
+## Groups tab
+
+Lists the realm's groups (`GET /groups`) and each group's members
+(`/groups/{id}/members`). The groups are **federated from OpenLDAP** via a
+`group-ldap-mapper` (`ou=groups`, `groupOfNames`), so it's **read-only** here —
+membership is managed in LDAP. Needs `query-groups`/`view-users` (covered by the
+demo users' grants).
+
 ## LDAP tab (federation settings)
 
 The **LDAP** nav tab shows a read-only view of the realm's LDAP user-storage
