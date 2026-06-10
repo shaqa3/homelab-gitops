@@ -5,7 +5,7 @@ local Keycloak using OpenID Connect (Authorization Code + PKCE). **`index.html`
 in this folder is the single source of truth** — it's both what ArgoCD deploys
 and what you serve for local dev.
 
-- Keycloak: `http://keycloak.192.168.64.3.nip.io`, realm `demo`, client `react-app`
+- Keycloak: `https://keycloak.192.168.64.3.nip.io`, realm `demo`, client `react-app`
 - React + keycloak-js are loaded from CDN; JSX is compiled in-browser by Babel.
 - Log in with a federated LDAP user, e.g. **`jdoe` / `secret123`** or
   **`asmith` / `secret123`**.
@@ -14,7 +14,15 @@ and what you serve for local dev.
 
 `nginx:alpine` serves `index.html` from a Kustomize-generated ConfigMap
 (`kustomization.yaml` → `configMapGenerator`), exposed at
-**http://react.192.168.64.3.nip.io** and managed by ArgoCD (`apps/react-app.yaml`).
+**https://react.192.168.64.3.nip.io** and managed by ArgoCD (`apps/react-app.yaml`).
+
+> **HTTPS / trust the local CA.** The app and Keycloak are served over HTTPS with
+> an [mkcert](https://github.com/FiloSottile/mkcert) cert (Kubernetes secret
+> `homelab-tls`, created out-of-band in each namespace — not in Git). HTTPS is
+> required: the app uses PKCE (S256), whose Web Crypto API only works in a secure
+> context, and an HTTPS page can't call an HTTP Keycloak (mixed content). For the
+> browser to trust the cert (and the Users-page `fetch` to succeed), run
+> **`mkcert -install`** once in your terminal, then restart the browser.
 
 To change the app: **edit `index.html`, commit, and push.** Kustomize re-hashes
 the ConfigMap name from the file contents, so ArgoCD rolls the pod automatically.

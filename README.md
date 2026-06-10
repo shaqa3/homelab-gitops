@@ -103,6 +103,30 @@ The app authenticates against Keycloak's `demo` realm using the public client
 `http://react.192.168.64.3.nip.io` (alongside the local dev ports). The Keycloak
 client itself is **not** in Git (it's realm config, like the LDAP federation).
 
+## TLS / HTTPS
+
+The ingresses serve HTTPS using an [mkcert](https://github.com/FiloSottile/mkcert)
+certificate (SANs for the `react`, `keycloak`, and `phpldapadmin` nip.io hosts),
+stored as a `kubernetes.io/tls` secret named **`homelab-tls`** in each namespace.
+That secret is **created out-of-band, not in Git** (it holds a private key):
+
+```bash
+mkcert -install   # once, trusts the local CA in your system/browser
+mkcert react.192.168.64.3.nip.io keycloak.192.168.64.3.nip.io phpldapadmin.192.168.64.3.nip.io
+for ns in react-app keycloak openldap; do
+  kubectl -n $ns create secret tls homelab-tls \
+    --cert=react.192.168.64.3.nip.io+2.pem --key=react.192.168.64.3.nip.io+2-key.pem \
+    --dry-run=client -o yaml | kubectl apply -f -
+done
+```
+
+- The Ingress manifests (in Git) reference `homelab-tls` via their `tls:` block.
+- **react-app** forces HTTPS (PKCE needs a secure context). **keycloak** sets
+  `ssl-redirect: "false"` so HTTP stays usable for CLI tooling that posts to
+  `http://keycloak/.../token`; the browser app uses `https://keycloak` explicitly.
+- For real TLS without the manual secret, install **cert-manager** with a
+  (self-signed or CA) `ClusterIssuer` and add `Certificate` resources to Git.
+
 ## Notes
 
 - `automated.prune` + `selfHeal` are on: ArgoCD reverts out-of-band `kubectl`
