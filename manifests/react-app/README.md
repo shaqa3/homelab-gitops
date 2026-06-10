@@ -130,6 +130,26 @@ federation key.
 > is not fully set up"* and **cannot log in** until it's filled. That's why the
 > create form makes email mandatory.
 
+### Realm role assignment
+
+The Edit panel lists the realm's roles as checkboxes; toggling one immediately
+assigns/unassigns it via `POST`/`DELETE` on
+`/admin/realms/demo/users/{id}/role-mappings/realm`. The composite
+`default-roles-demo` is hidden.
+
+This needs two realm-management roles, both granted to `jdoe`/`asmith`:
+`view-realm` (to *list* roles) and `manage-users` (to *change* mappings). Sample
+roles `app-admin`, `app-user`, `viewer` were created for the demo:
+
+```bash
+# create a realm role
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  http://keycloak.192.168.64.3.nip.io/admin/realms/demo/roles -d '{"name":"app-admin"}'
+```
+
+> Realm roles live in Keycloak only — they are **not** written to LDAP (LDAP
+> stores identity/credentials; authorization stays in Keycloak).
+
 > The browser can call the admin API because the `react-app` client's **Web
 > origins** include the app's origin, so the access token carries an
 > `allowed-origins` claim and Keycloak returns CORS headers for it.
