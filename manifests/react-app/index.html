@@ -4,40 +4,83 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Keycloak + React demo</title>
+
+  <!-- Apply the saved/system theme BEFORE first paint to avoid a flash -->
+  <script>
+    (function () {
+      var saved = localStorage.getItem('theme');
+      var theme = saved || (window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+
   <style>
+    /* ---- theme tokens ---- */
+    :root, [data-theme="dark"] {
+      --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8;
+      --border: #334155; --accent: #38bdf8; --accent-text: #042f3f;
+      --input-bg: #0b1220; --row-hover: #182231; --th: #93c5fd;
+      --form-bg: #162032; --pre-bg: #0b1220; --pre-text: #e2e8f0;
+      --err-bg: #3b1d1d; --err-text: #fca5a5; --ok: #6ee7b7;
+      --pill-bg: #064e3b; --pill-text: #6ee7b7;
+      --tag-fed-bg: #1e3a5f; --tag-fed-text: #7dd3fc;
+      --tag-local-bg: #3f2d1e; --tag-local-text: #fcd34d;
+      --shadow: 0 10px 40px rgba(0,0,0,.4);
+    }
+    [data-theme="light"] {
+      --bg: #eef2f7; --card: #ffffff; --text: #0f172a; --muted: #64748b;
+      --border: #e2e8f0; --accent: #0284c7; --accent-text: #ffffff;
+      --input-bg: #f8fafc; --row-hover: #f1f5f9; --th: #0369a1;
+      --form-bg: #f8fafc; --pre-bg: #0f172a; --pre-text: #e2e8f0;
+      --err-bg: #fee2e2; --err-text: #b91c1c; --ok: #047857;
+      --pill-bg: #d1fae5; --pill-text: #047857;
+      --tag-fed-bg: #dbeafe; --tag-fed-text: #1d4ed8;
+      --tag-local-bg: #fef3c7; --tag-local-text: #b45309;
+      --shadow: 0 10px 30px rgba(15,23,42,.12);
+    }
+
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
     body { margin: 0; min-height: 100vh; display: grid; place-items: center;
-           background: #0f172a; color: #e2e8f0; }
-    .card { background: #1e293b; padding: 2rem 2.5rem; border-radius: 14px;
-            box-shadow: 0 10px 40px rgba(0,0,0,.4); width: min(640px, 94vw); }
+           background: var(--bg); color: var(--text);
+           transition: background .2s ease, color .2s ease; }
+    .card { background: var(--card); padding: 2rem 2.5rem; border-radius: 14px;
+            box-shadow: var(--shadow); width: min(640px, 94vw);
+            transition: background .2s ease; }
     h1 { margin: 0 0 .25rem; font-size: 1.4rem; }
-    .muted { color: #94a3b8; font-size: .9rem; margin-top: 0; }
+    code { color: var(--accent); }
+    .muted { color: var(--muted); font-size: .9rem; margin-top: 0; }
     button { font-size: 1rem; padding: .6rem 1.1rem; border: 0; border-radius: 8px;
              cursor: pointer; font-weight: 600; }
-    .primary { background: #38bdf8; color: #042f3f; }
-    .ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; }
-    .row { display: flex; gap: .6rem; margin-top: 1.25rem; flex-wrap: wrap; }
+    .primary { background: var(--accent); color: var(--accent-text); }
+    .ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .row { display: flex; gap: .6rem; margin-top: 1.25rem; flex-wrap: wrap; align-items: center; }
     .kv { display: grid; grid-template-columns: auto 1fr; gap: .35rem .75rem;
           margin-top: 1rem; font-size: .92rem; }
-    .kv b { color: #93c5fd; }
-    pre { background: #0b1220; padding: .75rem; border-radius: 8px; overflow: auto;
-          font-size: .75rem; max-height: 220px; }
-    .pill { display: inline-block; background: #064e3b; color: #6ee7b7;
+    .kv b { color: var(--th); }
+    pre { background: var(--pre-bg); color: var(--pre-text); padding: .75rem;
+          border-radius: 8px; overflow: auto; font-size: .75rem; max-height: 220px; }
+    .pill { display: inline-block; background: var(--pill-bg); color: var(--pill-text);
             padding: .15rem .6rem; border-radius: 999px; font-size: .75rem; }
-    nav { display: flex; gap: .4rem; border-bottom: 1px solid #334155;
-          margin-bottom: 1.1rem; }
-    nav button { background: none; border: 0; color: #94a3b8; padding: .5rem .9rem;
+    nav { display: flex; gap: .4rem; border-bottom: 1px solid var(--border);
+          margin-bottom: 1.1rem; align-items: center; }
+    nav button { background: none; border: 0; color: var(--muted); padding: .5rem .9rem;
                  border-bottom: 2px solid transparent; border-radius: 0; }
-    nav button.active { color: #e2e8f0; border-bottom-color: #38bdf8; }
+    nav button.active { color: var(--text); border-bottom-color: var(--accent); }
     table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .88rem; }
-    th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #283548; }
-    th { color: #93c5fd; font-weight: 600; }
-    tr:hover td { background: #182231; }
+    th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--th); font-weight: 600; }
+    tr:hover td { background: var(--row-hover); }
     .tag { font-size: .72rem; padding: .1rem .45rem; border-radius: 999px; }
-    .tag.fed { background: #1e3a5f; color: #7dd3fc; }
-    .tag.local { background: #3f2d1e; color: #fcd34d; }
-    .err { background: #3b1d1d; color: #fca5a5; padding: .75rem 1rem;
+    .tag.fed { background: var(--tag-fed-bg); color: var(--tag-fed-text); }
+    .tag.local { background: var(--tag-local-bg); color: var(--tag-local-text); }
+    .err { background: var(--err-bg); color: var(--err-text); padding: .75rem 1rem;
            border-radius: 8px; margin-top: 1rem; font-size: .88rem; }
+    .inp { padding: .5rem .6rem; border-radius: 7px; border: 1px solid var(--border);
+           background: var(--input-bg); color: var(--text); font-size: .9rem; }
+    .newform { margin-top: 1rem; display: grid; gap: .6rem; grid-template-columns: 1fr 1fr;
+               background: var(--form-bg); padding: 1rem; border-radius: 10px; }
+    .theme-btn { padding: .35rem .7rem; font-size: .85rem; }
   </style>
 
   <!-- React (UMD globals) + Babel for in-browser JSX -->
@@ -66,6 +109,21 @@
 
     let keycloak; // single instance
 
+    function ThemeToggle() {
+      const [theme, setTheme] = useState(document.documentElement.dataset.theme || 'dark');
+      const toggle = () => {
+        const next = theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem('theme', next);
+        setTheme(next);
+      };
+      return (
+        <button className="ghost theme-btn" onClick={toggle} title="Toggle light / dark">
+          {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+        </button>
+      );
+    }
+
     function App() {
       const [status, setStatus] = useState('loading'); // loading | anon | authed | error
       const [profile, setProfile] = useState(null);
@@ -91,6 +149,7 @@
         <p className="muted">Check the console. Is Keycloak reachable and the redirect URI allowed?</p></Card>;
       if (status === 'anon') return (
         <Card>
+          <div className="row" style={{ marginTop: 0, justifyContent: 'flex-end' }}><ThemeToggle /></div>
           <h1>Keycloak + React</h1>
           <p className="muted">You are not signed in.</p>
           <div className="row"><button className="primary" onClick={() => keycloak.login()}>Log in with Keycloak</button></div>
@@ -103,6 +162,7 @@
             <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Profile</button>
             <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Users</button>
             <span style={{ marginLeft: 'auto' }} />
+            <ThemeToggle />
             <button className="ghost" onClick={() => keycloak.logout()}>Log out</button>
           </nav>
           {tab === 'profile' ? <Profile profile={profile} /> : <Users />}
@@ -242,19 +302,15 @@
         } finally { setBusy(false); }
       };
 
-      const inp = { padding: '.5rem .6rem', borderRadius: '7px', border: '1px solid #334155',
-                    background: '#0b1220', color: '#e2e8f0', fontSize: '.9rem' };
       return (
-        <form onSubmit={submit} style={{ marginTop: '1rem', display: 'grid', gap: '.6rem',
-              gridTemplateColumns: '1fr 1fr', background: '#162032', padding: '1rem',
-              borderRadius: '10px' }}>
-          <input style={inp} placeholder="username *" required value={form.username} onChange={set('username')} />
-          <input style={inp} placeholder="password *" type="password" required value={form.password} onChange={set('password')} />
-          <input style={inp} placeholder="first name" value={form.firstName} onChange={set('firstName')} />
-          <input style={inp} placeholder="last name" value={form.lastName} onChange={set('lastName')} />
-          <input style={{ ...inp, gridColumn: '1 / -1' }} placeholder="email" type="email" value={form.email} onChange={set('email')} />
+        <form onSubmit={submit} className="newform">
+          <input className="inp" placeholder="username *" required value={form.username} onChange={set('username')} />
+          <input className="inp" placeholder="password *" type="password" required value={form.password} onChange={set('password')} />
+          <input className="inp" placeholder="first name" value={form.firstName} onChange={set('firstName')} />
+          <input className="inp" placeholder="last name" value={form.lastName} onChange={set('lastName')} />
+          <input className="inp" style={{ gridColumn: '1 / -1' }} placeholder="email" type="email" value={form.email} onChange={set('email')} />
           {msg && <div style={{ gridColumn: '1 / -1', fontSize: '.85rem',
-            color: msg.ok ? '#6ee7b7' : '#fca5a5' }}>{msg.text}</div>}
+            color: msg.ok ? 'var(--ok)' : 'var(--err-text)' }}>{msg.text}</div>}
           <div style={{ gridColumn: '1 / -1' }}>
             <button className="primary" type="submit" disabled={busy}>
               {busy ? 'Creating…' : 'Create user'}
