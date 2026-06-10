@@ -234,6 +234,43 @@
                       "modifyTimestamp"
                     ]
                   }
+                },
+                {
+                  "name": "groups",
+                  "providerId": "group-ldap-mapper",
+                  "subComponents": {},
+                  "config": {
+                    "groups.dn": [
+                      "ou=groups,dc=example,dc=org"
+                    ],
+                    "group.name.ldap.attribute": [
+                      "cn"
+                    ],
+                    "group.object.classes": [
+                      "groupOfNames"
+                    ],
+                    "membership.ldap.attribute": [
+                      "member"
+                    ],
+                    "membership.attribute.type": [
+                      "DN"
+                    ],
+                    "membership.user.ldap.attribute": [
+                      "uid"
+                    ],
+                    "mode": [
+                      "READ_ONLY"
+                    ],
+                    "user.roles.retrieve.strategy": [
+                      "LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"
+                    ],
+                    "preserve.group.inheritance": [
+                      "false"
+                    ],
+                    "drop.non.existing.groups.during.sync": [
+                      "false"
+                    ]
+                  }
                 }
               ]
             },

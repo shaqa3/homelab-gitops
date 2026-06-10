@@ -167,6 +167,7 @@
           <nav>
             <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Profile</button>
             <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Users</button>
+            <button className={tab === 'groups' ? 'active' : ''} onClick={() => setTab('groups')}>Groups</button>
             <button className={tab === 'ldap' ? 'active' : ''} onClick={() => setTab('ldap')}>LDAP</button>
             <span style={{ marginLeft: 'auto' }} />
             <ThemeToggle />
@@ -174,6 +175,7 @@
           </nav>
           {tab === 'profile' ? <Profile profile={profile} />
             : tab === 'users' ? <Users />
+            : tab === 'groups' ? <Groups />
             : <LdapSettings />}
         </Card>
       );
@@ -535,6 +537,58 @@
             <button className="danger" type="button" onClick={del} disabled={busy}>Delete user</button>
           </div>
         </form>
+      );
+    }
+
+    function Groups() {
+      const [state, setState] = useState({ loading: true, groups: null, error: null });
+      const load = async () => {
+        setState({ loading: true, groups: null, error: null });
+        try {
+          const res = await adminFetch('/groups?briefRepresentation=false&max=100');
+          if (res.status === 403) { setState({ loading: false, groups: null, error: "Need 'query-groups'/'view-users' to list groups." }); return; }
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const groups = await res.json();
+          // fetch members per group (small N)
+          await Promise.all(groups.map(async (g) => {
+            try {
+              const m = await adminFetch(`/groups/${g.id}/members?briefRepresentation=true`);
+              g.members = m.ok ? (await m.json()).map((u) => u.username) : [];
+            } catch { g.members = []; }
+          }));
+          groups.sort((a, b) => a.name.localeCompare(b.name));
+          setState({ loading: false, groups, error: null });
+        } catch (e) { setState({ loading: false, groups: null, error: e.message }); }
+      };
+      useEffect(() => { load(); }, []);
+
+      return (
+        <div>
+          <h1>Groups <span className="muted" style={{ fontSize: '.9rem', fontWeight: 400 }}>
+            in realm <code>demo</code></span></h1>
+          <p className="muted">Federated from OpenLDAP (<code>ou=groups</code>, <code>groupOfNames</code>).
+            Membership is read-only here — it's managed in LDAP.</p>
+          {state.loading && <p className="muted">Loading…</p>}
+          {state.error && <div className="err">{state.error}</div>}
+          {state.groups && (state.groups.length === 0
+            ? <p className="muted">No groups.</p>
+            : <table>
+                <thead><tr><th>Group</th><th>Path</th><th>Members</th></tr></thead>
+                <tbody>
+                  {state.groups.map((g) => (
+                    <tr key={g.id}>
+                      <td>{g.name}</td>
+                      <td style={{ fontFamily: 'monospace' }}>{g.path}</td>
+                      <td>{g.members && g.members.length
+                        ? <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '.25rem' }}>
+                            {g.members.map((u) => <span key={u} className="tag role">{u}</span>)}</span>
+                        : <span className="muted">—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>)}
+          <div className="row"><button className="ghost" onClick={load}>Refresh</button></div>
+        </div>
       );
     }
 
