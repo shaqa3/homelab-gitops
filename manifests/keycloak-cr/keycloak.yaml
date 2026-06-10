@@ -5,6 +5,13 @@ metadata:
   namespace: keycloak
 spec:
   instances: 1
+  # Pin the server image to 26.6.3 (matches the realm export). 26.3.x had an NPE
+  # in the fine-grained-admin-permissions + LDAP group-mapper path that broke
+  # admin API calls for federated users in groups. startOptimized:false because
+  # the stock image isn't pre-built for our config (operator would pass
+  # --optimized otherwise and the first start fails).
+  image: quay.io/keycloak/keycloak:26.6.3
+  startOptimized: false
   db:
     vendor: postgres
     host: postgres-kc
