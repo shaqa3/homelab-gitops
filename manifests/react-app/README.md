@@ -110,13 +110,25 @@ Creating users needs the stronger `manage-users` role (also granted to `jdoe` an
 `asmith`). The form surfaces `403` (no permission) and `409` (already exists) as
 inline messages.
 
-### Editing users (Edit)
+### Editing users (Edit / reset password / delete)
 
-Each row has an **Edit** button that opens an inline form to update first name,
-last name, email, and the enabled flag, then `PUT`s to
-`/admin/realms/demo/users/{id}`. For LDAP-federated users this **writes through to
-OpenLDAP** (WRITABLE edit mode) — verify with `ldapsearch` as above. Editing also
-needs `manage-users`. (Username isn't editable — it's the federation key.)
+Each row has an **Edit** button that opens an inline panel to:
+
+- **Update** first name, last name, email, and the enabled flag — `PUT
+  /admin/realms/demo/users/{id}`.
+- **Reset password** — fill the "new password" field; it calls `PUT
+  …/users/{id}/reset-password` (leave blank to keep the current one).
+- **Delete user** — the red button (with a confirm prompt) → `DELETE
+  …/users/{id}`.
+
+All of these **write through to OpenLDAP** for federated users (WRITABLE edit
+mode) and need the `manage-users` role. Username isn't editable — it's the
+federation key.
+
+> **Email is required.** Keycloak 26's user profile requires email (and
+> first/last name); a user created/edited without an email is flagged *"Account
+> is not fully set up"* and **cannot log in** until it's filled. That's why the
+> create form makes email mandatory.
 
 > The browser can call the admin API because the `react-app` client's **Web
 > origins** include the app's origin, so the access token carries an
