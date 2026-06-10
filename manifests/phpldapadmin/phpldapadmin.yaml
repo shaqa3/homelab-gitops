@@ -53,6 +53,10 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - phpldapadmin.192.168.64.3.nip.io
+      secretName: homelab-tls   # mkcert cert, created out-of-band (not in Git)
   rules:
     - host: phpldapadmin.192.168.64.3.nip.io
       http:

@@ -4,6 +4,10 @@ metadata:
   name: react-app
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - react.192.168.64.3.nip.io
+      secretName: homelab-tls   # mkcert cert, created out-of-band (not in Git)
   rules:
     - host: react.192.168.64.3.nip.io
       http:

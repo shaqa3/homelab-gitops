@@ -91,6 +91,10 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - keycloak.192.168.64.3.nip.io
+      secretName: homelab-tls   # mkcert cert, created out-of-band (not in Git)
   rules:
     - host: keycloak.192.168.64.3.nip.io
       http:

@@ -102,7 +102,7 @@
     const { useState, useEffect } = React;
 
     const KC_CONFIG = {
-      url: 'http://keycloak.192.168.64.3.nip.io',
+      url: 'https://keycloak.192.168.64.3.nip.io',
       realm: 'demo',
       clientId: 'react-app',
     };
@@ -136,12 +136,10 @@
           }
           try {
             keycloak = new window.Keycloak(KC_CONFIG);
-            // NOTE: no PKCE here. PKCE (S256) needs the Web Crypto API
-            // (crypto.subtle), which browsers expose ONLY in a secure context
-            // (HTTPS or http://localhost). This app is served over plain HTTP at
-            // a nip.io host, so crypto.subtle is unavailable and PKCE would make
-            // login() throw. Serve over HTTPS to re-enable PKCE.
-            const authed = await keycloak.init({ checkLoginIframe: false });
+            // PKCE (S256) needs the Web Crypto API (crypto.subtle), which the
+            // browser exposes only in a secure context. The app is served over
+            // HTTPS (mkcert cert), so this works.
+            const authed = await keycloak.init({ pkceMethod: 'S256', checkLoginIframe: false });
             if (authed) { setProfile(keycloak.tokenParsed); setStatus('authed'); }
             else setStatus('anon');
           } catch (e) { console.error(e); setStatus('error'); }
