@@ -132,11 +132,15 @@ federation key.
 
 ### Realm role assignment
 
-The user table has a **Roles** column showing each user's assigned realm roles
-(the list fetches `/users/{id}/role-mappings/realm` per user in parallel). The
-Edit panel lists the realm's roles as checkboxes; toggling one immediately
-assigns/unassigns it via `POST`/`DELETE` on the same endpoint, and the table
-refreshes when the panel closes. The composite `default-roles-demo` is hidden.
+The user table's **Roles (effective)** column shows each user's *effective* realm
+roles — fetched per user from both `/role-mappings/realm` (direct) and
+`/role-mappings/realm/composite` (effective). Solid pills are **directly
+assigned**; dashed pills are **inherited from a group** (a role in the composite
+set but not the direct set). The technical defaults (`default-roles-demo`,
+`offline_access`, `uma_authorization`) are hidden. The Edit panel lists the
+realm's roles as checkboxes; toggling one immediately assigns/unassigns it via
+`POST`/`DELETE` on `/role-mappings/realm`, and the table refreshes when the panel
+closes.
 
 This needs two realm-management roles, both granted to `jdoe`/`asmith`:
 `view-realm` (to *list* roles) and `manage-users` (to *change* mappings). Sample
