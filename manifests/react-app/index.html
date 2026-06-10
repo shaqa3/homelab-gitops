@@ -74,6 +74,7 @@
     .tag { font-size: .72rem; padding: .1rem .45rem; border-radius: 999px; }
     .tag.fed { background: var(--tag-fed-bg); color: var(--tag-fed-text); }
     .tag.local { background: var(--tag-local-bg); color: var(--tag-local-text); }
+    .tag.role { background: var(--pill-bg); color: var(--pill-text); }
     .err { background: var(--err-bg); color: var(--err-text); padding: .75rem 1rem;
            border-radius: 8px; margin-top: 1rem; font-size: .88rem; }
     .inp { padding: .5rem .6rem; border-radius: 7px; border: 1px solid var(--border);
@@ -223,6 +224,15 @@
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const users = await res.json();
           users.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+          // fetch each user's realm roles in parallel (small lab — N is tiny)
+          await Promise.all(users.map(async (u) => {
+            try {
+              const r = await adminFetch(`/users/${u.id}/role-mappings/realm`);
+              u.realmRoles = r.ok
+                ? (await r.json()).map((x) => x.name).filter((n) => n !== 'default-roles-demo').sort()
+                : null; // null = couldn't read (e.g. missing permission)
+            } catch { u.realmRoles = null; }
+          }));
           setState({ loading: false, users, error: null });
         } catch (e) {
           setState({ loading: false, users: null, error: e.message });
@@ -240,7 +250,7 @@
           {state.error && <div className="err">{state.error}</div>}
           {state.users && (
             <table>
-              <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Source</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Source</th><th>Status</th><th>Roles</th><th></th></tr></thead>
               <tbody>
                 {state.users.map((u) => (
                   <tr key={u.id}>
@@ -250,6 +260,13 @@
                     <td><span className={'tag ' + (u.federationLink ? 'fed' : 'local')}>
                       {u.federationLink ? 'LDAP' : 'local'}</span></td>
                     <td>{u.enabled ? 'enabled' : 'disabled'}</td>
+                    <td>
+                      {u.realmRoles === null ? <span className="muted">—</span>
+                        : u.realmRoles.length === 0 ? <span className="muted">—</span>
+                        : <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '.25rem' }}>
+                            {u.realmRoles.map((r) => <span key={r} className="tag role">{r}</span>)}
+                          </span>}
+                    </td>
                     <td><button className="ghost rowbtn"
                       onClick={() => { setShowForm(false); setEditing(u); }}>Edit</button></td>
                   </tr>
@@ -266,7 +283,7 @@
           {showForm && <CreateUser onDone={() => { setShowForm(false); load(); }} />}
           {editing && <EditUser user={editing}
             onDone={() => { setEditing(null); load(); }}
-            onCancel={() => setEditing(null)} />}
+            onCancel={() => { setEditing(null); load(); }} />}
         </div>
       );
     }
