@@ -10,11 +10,13 @@ gitops/
 ├── apps/                      # child ArgoCD Applications (watched by root)
 │   ├── openldap.yaml          # Helm chart (external repo) + values from this repo
 │   ├── phpldapadmin.yaml      # -> manifests/phpldapadmin
-│   └── keycloak.yaml          # -> manifests/keycloak
+│   ├── keycloak.yaml          # -> manifests/keycloak
+│   └── react-app.yaml         # -> manifests/react-app
 ├── manifests/
 │   ├── openldap/             # values.yaml for the Helm chart (no raw objects)
 │   ├── phpldapadmin/          # Deployment + Service + Ingress
-│   └── keycloak/             # Secret + Deployment + Service + Ingress
+│   ├── keycloak/             # Secret + Deployment + Service + Ingress
+│   └── react-app/            # nginx + Kustomize ConfigMap (index.html) + Ingress
 └── docs/                      # step-by-step guides for the whole lab
 ```
 
@@ -36,7 +38,7 @@ Full walkthroughs in [`docs/`](docs/):
 
 ## Scope
 
-- **Managed by ArgoCD:** OpenLDAP, phpLDAPadmin, Keycloak (workloads only).
+- **Managed by ArgoCD:** OpenLDAP, phpLDAPadmin, Keycloak, react-app (workloads only).
 - **NOT managed by ArgoCD:** the Keycloak `demo` realm and the LDAP user
   federation — those are configured via the Keycloak Admin API / the
   `keycloak-ldap-federation.sh` script, because they aren't plain Kubernetes
@@ -85,6 +87,20 @@ chart from the Helm repo, the values file from this Git repo, joined via a
 
 To change OpenLDAP config, edit `manifests/openldap/values.yaml`, commit, and
 push — ArgoCD re-renders the chart and syncs.
+
+## react-app (static SPA, no image build)
+
+The React login demo (`docs/`-documented app) is served at
+`http://react.192.168.64.3.nip.io` by a stock **`nginx:alpine`** with the app's
+`index.html` provided by a **Kustomize `configMapGenerator`** — so there's **no
+custom image to build or push**, and the whole thing is reproducible from Git.
+Kustomize hashes the ConfigMap name from the file contents, so editing
+`manifests/react-app/index.html` and pushing automatically rolls the pod.
+
+The app authenticates against Keycloak's `demo` realm using the public client
+`react-app`. That client's Valid redirect URIs / Web origins include
+`http://react.192.168.64.3.nip.io` (alongside the local dev ports). The Keycloak
+client itself is **not** in Git (it's realm config, like the LDAP federation).
 
 ## Notes
 
