@@ -1,5 +1,11 @@
 # Installing Keycloak in Minikube
 
+> **Note:** the live lab has since migrated to the **Keycloak Operator**
+> (Postgres-backed, with the `demo` realm imported via `KeycloakRealmImport`) —
+> see the repo README's "Keycloak (Operator-managed)" section and
+> `manifests/keycloak-operator/` + `manifests/keycloak-cr/`. This guide remains a
+> useful, dependency-light way to run Keycloak in dev mode.
+
 A step-by-step guide to running Keycloak (SSO / identity provider) in a local
 minikube cluster. Uses the official `quay.io/keycloak/keycloak` image in **dev
 mode** (`start-dev`) — an in-memory H2 database, so there's no external database

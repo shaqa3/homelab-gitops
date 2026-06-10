@@ -15,7 +15,9 @@ gitops/
 ├── manifests/
 │   ├── openldap/             # values.yaml for the Helm chart (no raw objects)
 │   ├── phpldapadmin/          # Deployment + Service + Ingress
-│   ├── keycloak/             # Secret + Deployment + Service + Ingress
+│   ├── keycloak/             # just the Ingress (workload is operator-managed)
+│   ├── keycloak-operator/     # Keycloak Operator: CRDs + operator deployment
+│   ├── keycloak-cr/          # Postgres + Keycloak CR (kc) + KeycloakRealmImport
 │   └── react-app/            # nginx + Kustomize ConfigMap (index.html) + Ingress
 └── docs/                      # step-by-step guides for the whole lab
 ```
@@ -38,7 +40,9 @@ Full walkthroughs in [`docs/`](docs/):
 
 ## Scope
 
-- **Managed by ArgoCD:** OpenLDAP, phpLDAPadmin, Keycloak, react-app (workloads only).
+- **Managed by ArgoCD:** OpenLDAP, phpLDAPadmin, the Keycloak Operator +
+  `Keycloak` CR + `KeycloakRealmImport` (so the `demo` realm structure is now
+  declarative too), and react-app.
 - **NOT managed by ArgoCD:** the Keycloak `demo` realm and the LDAP user
   federation — those are configured via the Keycloak Admin API / the
   `keycloak-ldap-federation.sh` script, because they aren't plain Kubernetes
@@ -102,6 +106,31 @@ The app authenticates against Keycloak's `demo` realm using the public client
 `react-app`. That client's Valid redirect URIs / Web origins include
 `http://react.192.168.64.3.nip.io` (alongside the local dev ports). The Keycloak
 client itself is **not** in Git (it's realm config, like the LDAP federation).
+
+## Keycloak (Operator-managed)
+
+Keycloak runs via the **Keycloak Operator** rather than a hand-rolled Deployment:
+
+- `manifests/keycloak-operator/` — the operator's CRDs (`Keycloak`,
+  `KeycloakRealmImport`) and operator Deployment (app `keycloak-operator`,
+  sync-wave `-1` so CRDs exist first).
+- `manifests/keycloak-cr/` — **Postgres** + a `Keycloak` CR named `kc` (prod mode,
+  `http` enabled with TLS terminated at the ingress, `proxy: xforwarded`) + a
+  **`KeycloakRealmImport`** that declaratively recreates the `demo` realm
+  (react-app client, realm roles, LDAP federation + mappers).
+- `manifests/keycloak/` — now just the **Ingress**, pointed at the operator's
+  `kc-service`.
+
+The realm import JSON was built from a realm export with the masked LDAP
+`bindCredential` re-injected. Two things are **not** in Git (they're identity /
+per-user state, not realm structure): the `admin/admin` master user (recreated
+once; persists in Postgres) and the realm-management role grants to
+`jdoe`/`asmith` (federated users aren't part of the realm JSON). LDAP users
+themselves re-import from OpenLDAP automatically.
+
+> Editing `manifests/keycloak-cr/realmimport.yaml` and pushing re-runs the import
+> job. The operator generates an initial admin in the `kc-initial-admin` secret;
+> the lab's permanent `admin/admin` was created on top of that.
 
 ## TLS / HTTPS
 
