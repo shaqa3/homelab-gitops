@@ -136,7 +136,12 @@
           }
           try {
             keycloak = new window.Keycloak(KC_CONFIG);
-            const authed = await keycloak.init({ pkceMethod: 'S256', checkLoginIframe: false });
+            // NOTE: no PKCE here. PKCE (S256) needs the Web Crypto API
+            // (crypto.subtle), which browsers expose ONLY in a secure context
+            // (HTTPS or http://localhost). This app is served over plain HTTP at
+            // a nip.io host, so crypto.subtle is unavailable and PKCE would make
+            // login() throw. Serve over HTTPS to re-enable PKCE.
+            const authed = await keycloak.init({ checkLoginIframe: false });
             if (authed) { setProfile(keycloak.tokenParsed); setStatus('authed'); }
             else setStatus('anon');
           } catch (e) { console.error(e); setStatus('error'); }
