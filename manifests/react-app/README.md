@@ -151,6 +151,22 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 > Realm roles live in Keycloak only — they are **not** written to LDAP (LDAP
 > stores identity/credentials; authorization stays in Keycloak).
 
+The Edit panel also has:
+
+- **Client roles** — a client dropdown (defaults to `realm-management`) +
+  checkboxes to assign that client's roles (`role-mappings/clients/{id}`). Needs
+  `view-clients` to list clients.
+- **Required actions** — toggle pending actions like `UPDATE_PASSWORD` /
+  `VERIFY_EMAIL` (`PUT` the user's `requiredActions`). Useful when a user is
+  *"not fully set up"*.
+- **Active sessions** — lists the user's sessions (clients, IP, start time) from
+  `/users/{id}/sessions`, with a **Log out all sessions** button
+  (`POST /users/{id}/logout`).
+
+> The demo users `jdoe`/`asmith` were granted a broad realm-management set
+> (`view-realm`, `manage-realm`, `view-users`, `query-users`, `manage-users`,
+> `view-clients`) so all of the above work from a normal login.
+
 ### LDAP directory entry
 
 For a federated user, the Edit panel shows a read-only **LDAP directory entry**
@@ -180,6 +196,12 @@ users** (incremental) buttons — `POST
 `manage-users`) — and shows the resulting added/updated/removed/failed counts.
 The config itself is read-only: editing connection/bind settings stays with the
 Keycloak Admin Console, not this SPA.
+
+The tab also has **Test connection** / **Test authentication** buttons
+(`POST /testLDAPConnection`, needs `manage-realm`) and an **Attribute mappers**
+table showing how LDAP attributes map to Keycloak — e.g. `uid → username`,
+`mail → email`, `cn → firstName`, `sn → lastName` (this is also why a seeded
+`cn: John Doe` shows as first name "John Doe").
 
 ## Upgrade to a real Vite project (optional)
 
