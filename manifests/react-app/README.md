@@ -1,0 +1,120 @@
+# react-app — Keycloak + React login demo
+
+A minimal React app (single `index.html`, no build step) that logs in against the
+local Keycloak using OpenID Connect (Authorization Code + PKCE). **`index.html`
+in this folder is the single source of truth** — it's both what ArgoCD deploys
+and what you serve for local dev.
+
+- Keycloak: `http://keycloak.192.168.64.3.nip.io`, realm `demo`, client `react-app`
+- React + keycloak-js are loaded from CDN; JSX is compiled in-browser by Babel.
+- Log in with a federated LDAP user, e.g. **`jdoe` / `secret123`** or
+  **`asmith` / `secret123`**.
+
+## How it's deployed
+
+`nginx:alpine` serves `index.html` from a Kustomize-generated ConfigMap
+(`kustomization.yaml` → `configMapGenerator`), exposed at
+**http://react.192.168.64.3.nip.io** and managed by ArgoCD (`apps/react-app.yaml`).
+
+To change the app: **edit `index.html`, commit, and push.** Kustomize re-hashes
+the ConfigMap name from the file contents, so ArgoCD rolls the pod automatically.
+No image build, no registry.
+
+## Local dev (optional)
+
+Serve this same folder over HTTP (not `file://`, so the OIDC redirect works):
+
+```bash
+cd gitops/manifests/react-app
+python3 -m http.server 8000
+```
+
+Open **http://localhost:8000**. The `react-app` Keycloak client allows redirects
+from `http://localhost:8000/*` and `:5173/*` as well as the ingress host, so both
+local and in-cluster work. (To use another port, add it to the client's Valid
+redirect URIs and Web origins.)
+
+## Theme
+
+Top-right **☀️ Light / 🌙 Dark** button toggles the theme. The choice is saved in
+`localStorage`; on first visit it follows your OS `prefers-color-scheme`. Colors
+are CSS custom properties under `[data-theme]`, and an inline script applies the
+saved theme before first paint so there's no flash.
+
+## How the login works
+
+1. `keycloak.init()` runs on load. With no session it resolves "not
+   authenticated" and the app shows a **Log in** button.
+2. `keycloak.login()` redirects the browser to Keycloak. You authenticate (your
+   password is checked against OpenLDAP via federation).
+3. Keycloak redirects back with an authorization code; `keycloak.init()`
+   exchanges it (with PKCE) for tokens.
+4. The app reads the ID-token claims (`preferred_username`, `name`, `email`) and
+   renders the signed-in view. **Log out** calls `keycloak.logout()`.
+
+`checkLoginIframe` is disabled because the app and Keycloak are different origins,
+so the session-status iframe would be blocked by third-party-cookie rules.
+
+## Users page
+
+After logging in, the **Users** tab lists every user in the `demo` realm, fetched
+live from the Keycloak **Admin REST API** (`GET /admin/realms/demo/users`) using
+your access token. Each row shows username, name, email, source (**LDAP** =
+federated from OpenLDAP vs **local** = created in Keycloak), and enabled status.
+
+### It needs the `view-users` permission
+
+Listing users is an admin operation. A normal login can't do it, so the demo
+users were granted the `view-users` (and `query-users`) client roles from
+`realm-management`:
+
+```bash
+# grant view-users to a user (replace <USER>)
+KC=http://keycloak.192.168.64.3.nip.io
+TOKEN=$(curl -s -X POST $KC/realms/master/protocol/openid-connect/token \
+  -d client_id=admin-cli -d username=admin -d password=admin -d grant_type=password \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+RM=$(curl -s -H "Authorization: Bearer $TOKEN" "$KC/admin/realms/demo/clients?clientId=realm-management" \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["id"])')
+ROLE=$(curl -s -H "Authorization: Bearer $TOKEN" "$KC/admin/realms/demo/clients/$RM/roles/view-users")
+UID=$(curl -s -H "Authorization: Bearer $TOKEN" "$KC/admin/realms/demo/users?username=<USER>&exact=true" \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["id"])')
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  "$KC/admin/realms/demo/users/$UID/role-mappings/clients/$RM" -d "[$ROLE]"
+```
+
+`jdoe` and `asmith` already have it. A user *without* the role still loads the app
+fine; the Users tab just shows a "you don't have permission" message (`403`).
+
+### Creating users (＋ New user)
+
+The Users tab has a **＋ New user** form that `POST`s to
+`/admin/realms/demo/users`. Because the LDAP federation runs in `WRITABLE` mode
+with `syncRegistrations` on, **a user created here is written straight into
+OpenLDAP** — verify with:
+
+```bash
+kubectl -n openldap exec openldap-0 -- ldapsearch -x -H ldap://localhost:389 \
+  -b "ou=people,dc=example,dc=org" -D "cn=admin,dc=example,dc=org" -w admin "(uid=<new>)"
+```
+
+Creating users needs the stronger `manage-users` role (also granted to `jdoe` and
+`asmith`). The form surfaces `403` (no permission) and `409` (already exists) as
+inline messages.
+
+> The browser can call the admin API because the `react-app` client's **Web
+> origins** include the app's origin, so the access token carries an
+> `allowed-origins` claim and Keycloak returns CORS headers for it.
+
+## Upgrade to a real Vite project (optional)
+
+This CDN/Babel setup is for zero-install simplicity (no Node needed). For a
+production-style app, install Node and scaffold Vite:
+
+```bash
+npm create vite@latest keycloak-react -- --template react
+cd keycloak-react && npm install keycloak-js
+```
+
+…then port the logic from `index.html` into `src/`. The `react-app` Keycloak
+client already allows Vite's default port (`http://localhost:5173`).

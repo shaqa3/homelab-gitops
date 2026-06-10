@@ -90,7 +90,8 @@ push — ArgoCD re-renders the chart and syncs.
 
 ## react-app (static SPA, no image build)
 
-The React login demo (`docs/`-documented app) is served at
+The React login demo (documented in
+[`manifests/react-app/README.md`](manifests/react-app/README.md)) is served at
 `http://react.192.168.64.3.nip.io` by a stock **`nginx:alpine`** with the app's
 `index.html` provided by a **Kustomize `configMapGenerator`** — so there's **no
 custom image to build or push**, and the whole thing is reproducible from Git.
