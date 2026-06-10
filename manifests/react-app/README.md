@@ -110,6 +110,14 @@ Creating users needs the stronger `manage-users` role (also granted to `jdoe` an
 `asmith`). The form surfaces `403` (no permission) and `409` (already exists) as
 inline messages.
 
+### Editing users (Edit)
+
+Each row has an **Edit** button that opens an inline form to update first name,
+last name, email, and the enabled flag, then `PUT`s to
+`/admin/realms/demo/users/{id}`. For LDAP-federated users this **writes through to
+OpenLDAP** (WRITABLE edit mode) — verify with `ldapsearch` as above. Editing also
+needs `manage-users`. (Username isn't editable — it's the federation key.)
+
 > The browser can call the admin API because the `react-app` client's **Web
 > origins** include the app's origin, so the access token carries an
 > `allowed-origins` claim and Keycloak returns CORS headers for it.
