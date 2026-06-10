@@ -1,0 +1,304 @@
+{
+  "apiVersion": "k8s.keycloak.org/v2alpha1",
+  "kind": "KeycloakRealmImport",
+  "metadata": {
+    "name": "demo",
+    "namespace": "keycloak"
+  },
+  "spec": {
+    "keycloakCRName": "kc",
+    "realm": {
+      "realm": "demo",
+      "enabled": true,
+      "loginWithEmailAllowed": true,
+      "registrationEmailAsUsername": false,
+      "clients": [
+        {
+          "clientId": "react-app",
+          "name": "React Demo App",
+          "surrogateAuthRequired": false,
+          "enabled": true,
+          "alwaysDisplayInConsole": false,
+          "clientAuthenticatorType": "client-secret",
+          "redirectUris": [
+            "http://localhost:5173/*",
+            "http://react.192.168.64.3.nip.io/*",
+            "https://react.192.168.64.3.nip.io/*",
+            "http://localhost:8000/*"
+          ],
+          "webOrigins": [
+            "https://react.192.168.64.3.nip.io",
+            "http://localhost:8000",
+            "http://localhost:5173",
+            "http://react.192.168.64.3.nip.io"
+          ],
+          "notBefore": 0,
+          "bearerOnly": false,
+          "consentRequired": false,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "publicClient": true,
+          "frontchannelLogout": false,
+          "protocol": "openid-connect",
+          "attributes": {
+            "realm_client": "false",
+            "post.logout.redirect.uris": "http://localhost:5173/*##http://localhost:8000/*##http://react.192.168.64.3.nip.io/*##https://react.192.168.64.3.nip.io/*",
+            "pkce.code.challenge.method": "S256"
+          },
+          "authenticationFlowBindingOverrides": {},
+          "fullScopeAllowed": true,
+          "nodeReRegistrationTimeout": -1,
+          "defaultClientScopes": [
+            "web-origins",
+            "acr",
+            "roles",
+            "profile",
+            "basic",
+            "email"
+          ],
+          "optionalClientScopes": [
+            "address",
+            "phone",
+            "organization",
+            "offline_access",
+            "microprofile-jwt"
+          ]
+        }
+      ],
+      "roles": {
+        "realm": [
+          {
+            "name": "app-admin",
+            "description": "Demo app-admin role"
+          },
+          {
+            "name": "viewer",
+            "description": "Demo viewer role"
+          },
+          {
+            "name": "app-user",
+            "description": "Demo app-user role"
+          }
+        ]
+      },
+      "components": {
+        "org.keycloak.storage.UserStorageProvider": [
+          {
+            "name": "openldap",
+            "providerId": "ldap",
+            "subComponents": {
+              "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+                {
+                  "id": "97b17af3-1e40-4baa-b04c-f21299b9ee50",
+                  "name": "Kerberos principal attribute mapper",
+                  "providerId": "kerberos-principal-attribute-mapper",
+                  "subComponents": {},
+                  "config": {}
+                },
+                {
+                  "id": "6a18157b-f0d9-4f2b-a99a-6020166ad614",
+                  "name": "username",
+                  "providerId": "user-attribute-ldap-mapper",
+                  "subComponents": {},
+                  "config": {
+                    "ldap.attribute": [
+                      "uid"
+                    ],
+                    "is.mandatory.in.ldap": [
+                      "true"
+                    ],
+                    "read.only": [
+                      "false"
+                    ],
+                    "always.read.value.from.ldap": [
+                      "false"
+                    ],
+                    "user.model.attribute": [
+                      "username"
+                    ]
+                  }
+                },
+                {
+                  "id": "4c1a1d2c-d2dd-42e3-ab25-173b9f7ddb85",
+                  "name": "email",
+                  "providerId": "user-attribute-ldap-mapper",
+                  "subComponents": {},
+                  "config": {
+                    "ldap.attribute": [
+                      "mail"
+                    ],
+                    "is.mandatory.in.ldap": [
+                      "false"
+                    ],
+                    "read.only": [
+                      "false"
+                    ],
+                    "always.read.value.from.ldap": [
+                      "false"
+                    ],
+                    "user.model.attribute": [
+                      "email"
+                    ]
+                  }
+                },
+                {
+                  "id": "6cf6c3a2-d130-4006-af36-249f86f1a1be",
+                  "name": "creation date",
+                  "providerId": "user-attribute-ldap-mapper",
+                  "subComponents": {},
+                  "config": {
+                    "ldap.attribute": [
+                      "createTimestamp"
+                    ],
+                    "is.mandatory.in.ldap": [
+                      "false"
+                    ],
+                    "read.only": [
+                      "true"
+                    ],
+                    "always.read.value.from.ldap": [
+                      "true"
+                    ],
+                    "user.model.attribute": [
+                      "createTimestamp"
+                    ]
+                  }
+                },
+                {
+                  "id": "b0ca6a37-fa3c-4b00-935e-c4e2e380b2d5",
+                  "name": "last name",
+                  "providerId": "user-attribute-ldap-mapper",
+                  "subComponents": {},
+                  "config": {
+                    "ldap.attribute": [
+                      "sn"
+                    ],
+                    "is.mandatory.in.ldap": [
+                      "true"
+                    ],
+                    "read.only": [
+                      "false"
+                    ],
+                    "always.read.value.from.ldap": [
+                      "true"
+                    ],
+                    "user.model.attribute": [
+                      "lastName"
+                    ]
+                  }
+                },
+                {
+                  "id": "30fa0342-2c56-44fd-b34d-dffa510c7ba1",
+                  "name": "first name",
+                  "providerId": "user-attribute-ldap-mapper",
+                  "subComponents": {},
+                  "config": {
+                    "ldap.attribute": [
+                      "cn"
+                    ],
+                    "is.mandatory.in.ldap": [
+                      "true"
+                    ],
+                    "read.only": [
+                      "false"
+                    ],
+                    "always.read.value.from.ldap": [
+                      "true"
+                    ],
+                    "user.model.attribute": [
+                      "firstName"
+                    ]
+                  }
+                },
+                {
+                  "id": "fd1eed95-2ec8-4368-9932-c920060a3ceb",
+                  "name": "modify date",
+                  "providerId": "user-attribute-ldap-mapper",
+                  "subComponents": {},
+                  "config": {
+                    "ldap.attribute": [
+                      "modifyTimestamp"
+                    ],
+                    "is.mandatory.in.ldap": [
+                      "false"
+                    ],
+                    "read.only": [
+                      "true"
+                    ],
+                    "always.read.value.from.ldap": [
+                      "true"
+                    ],
+                    "user.model.attribute": [
+                      "modifyTimestamp"
+                    ]
+                  }
+                }
+              ]
+            },
+            "config": {
+              "krbPrincipalAttribute": [
+                "krb5PrincipalName"
+              ],
+              "pagination": [
+                "true"
+              ],
+              "searchScope": [
+                "1"
+              ],
+              "usersDn": [
+                "ou=people,dc=example,dc=org"
+              ],
+              "trustEmail": [
+                "true"
+              ],
+              "priority": [
+                "0"
+              ],
+              "importEnabled": [
+                "true"
+              ],
+              "enabled": [
+                "true"
+              ],
+              "userObjectClasses": [
+                "inetOrgPerson"
+              ],
+              "bindCredential": [
+                "admin"
+              ],
+              "usernameLDAPAttribute": [
+                "uid"
+              ],
+              "bindDn": [
+                "cn=admin,dc=example,dc=org"
+              ],
+              "rdnLDAPAttribute": [
+                "uid"
+              ],
+              "vendor": [
+                "other"
+              ],
+              "editMode": [
+                "WRITABLE"
+              ],
+              "uuidLDAPAttribute": [
+                "entryUUID"
+              ],
+              "connectionUrl": [
+                "ldap://openldap.openldap.svc.cluster.local:389"
+              ],
+              "syncRegistrations": [
+                "true"
+              ],
+              "authType": [
+                "simple"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
