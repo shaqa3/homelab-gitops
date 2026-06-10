@@ -520,6 +520,10 @@
             </div>
           </div>
 
+          <ClientRoles user={user} />
+          <RequiredActions user={user} />
+          <UserSessions user={user} />
+
           {msg && <div style={{ gridColumn: '1 / -1', fontSize: '.85rem',
             color: msg.ok ? 'var(--ok)' : 'var(--err-text)' }}>{msg.text}</div>}
           <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '.5rem', alignItems: 'center' }}>
@@ -538,6 +542,9 @@
       const [state, setState] = useState({ loading: true, prov: null, error: null });
       const [sync, setSync] = useState(null);     // { ok, text }
       const [syncing, setSyncing] = useState(false);
+      const [mappers, setMappers] = useState(null);
+      const [test, setTest] = useState(null);     // { ok, text }
+      const [testing, setTesting] = useState(false);
       useEffect(() => {
         (async () => {
           try {
@@ -547,9 +554,37 @@
             const list = await res.json();
             const prov = list.find((c) => c.providerId === 'ldap') || list[0] || null;
             setState({ loading: false, prov, error: null });
+            if (prov) {
+              const mr = await adminFetch(`/components?parent=${prov.id}&type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper`);
+              if (mr.ok) setMappers((await mr.json()).sort((a, b) => a.name.localeCompare(b.name)));
+            }
           } catch (e) { setState({ loading: false, prov: null, error: e.message }); }
         })();
       }, []);
+
+      const doTest = async (action, label) => {
+        setTesting(true); setTest(null);
+        const cf = state.prov.config; const v = (k) => (cf[k] && cf[k][0]) || '';
+        try {
+          const res = await adminFetch('/testLDAPConnection', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, componentId: state.prov.id,
+              connectionUrl: v('connectionUrl'), bindDn: v('bindDn'), bindCredential: '**********',
+              authType: v('authType') || 'simple', useTruststoreSpi: 'always', startTls: '', connectionTimeout: '' }),
+          });
+          if (res.status === 204) setTest({ ok: true, text: `${label}: success` });
+          else if (res.status === 403) setTest({ ok: false, text: `${label}: needs the 'manage-realm' role` });
+          else setTest({ ok: false, text: `${label}: failed (HTTP ${res.status})` });
+        } catch (e) { setTest({ ok: false, text: e.message }); }
+        finally { setTesting(false); }
+      };
+
+      const mapperAttr = (m) => {
+        const c = m.config || {};
+        const l = c['ldap.attribute'] && c['ldap.attribute'][0];
+        const u = c['user.model.attribute'] && c['user.model.attribute'][0];
+        return l && u ? `${l} → ${u}` : '';
+      };
 
       const doSync = async (action, label) => {
         setSyncing(true); setSync(null);
@@ -622,7 +657,171 @@
             Pulls users from LDAP into Keycloak in bulk (needs <code>manage-users</code>). New
             LDAP users also import automatically on first login/lookup.
           </p>
+
+          <div className="muted" style={{ fontSize: '.82rem', marginTop: '1.25rem', marginBottom: '.4rem' }}>
+            Connection test
+          </div>
+          <div className="row" style={{ marginTop: 0 }}>
+            <button className="ghost" disabled={testing} onClick={() => doTest('testConnection', 'Connection')}>Test connection</button>
+            <button className="ghost" disabled={testing} onClick={() => doTest('testAuthentication', 'Authentication')}>Test authentication</button>
+          </div>
+          {test && <div className={test.ok ? '' : 'err'}
+            style={{ marginTop: '.75rem', fontSize: '.86rem', color: test.ok ? 'var(--ok)' : undefined }}>{test.text}</div>}
+
+          {mappers && (
+            <div style={{ marginTop: '1.25rem' }}>
+              <div className="muted" style={{ fontSize: '.82rem', marginBottom: '.4rem' }}>
+                Attribute mappers <span style={{ opacity: .7 }}>({mappers.length})</span>
+              </div>
+              <table>
+                <thead><tr><th>Name</th><th>Type</th><th>LDAP → Keycloak</th></tr></thead>
+                <tbody>
+                  {mappers.map((m) => (
+                    <tr key={m.id}>
+                      <td>{m.name}</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: '.78rem' }}>{m.providerId}</td>
+                      <td style={{ fontFamily: 'monospace' }}>{mapperAttr(m) || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+      );
+    }
+
+    function Section({ title, children }) {
+      return (
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div className="muted" style={{ fontSize: '.82rem', marginBottom: '.4rem' }}>{title}</div>
+          {children}
+        </div>
+      );
+    }
+
+    function RequiredActions({ user }) {
+      const [avail, setAvail] = useState(null);
+      const [active, setActive] = useState(new Set());
+      const [err, setErr] = useState(null);
+      useEffect(() => { (async () => {
+        try {
+          const [ar, ur] = await Promise.all([
+            adminFetch('/authentication/required-actions'),
+            adminFetch(`/users/${user.id}`),
+          ]);
+          if (ar.ok) setAvail((await ar.json()).filter((a) => a.enabled));
+          const u = ur.ok ? await ur.json() : {};
+          setActive(new Set(u.requiredActions || []));
+        } catch (e) { setErr(e.message); }
+      })(); }, [user.id]);
+      const toggle = async (alias) => {
+        const next = new Set(active); next.has(alias) ? next.delete(alias) : next.add(alias);
+        const res = await adminFetch(`/users/${user.id}`, { method: 'PUT',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requiredActions: [...next] }) });
+        if (res.status === 204) { setActive(next); setErr(null); } else setErr(`Update failed (HTTP ${res.status}).`);
+      };
+      return (
+        <Section title="Required actions">
+          {err && <div style={{ fontSize: '.82rem', color: 'var(--err-text)' }}>{err}</div>}
+          {!avail ? <span className="muted" style={{ fontSize: '.82rem' }}>loading…</span>
+            : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem .9rem' }}>
+                {avail.map((a) => (
+                  <label key={a.alias} style={{ display: 'flex', gap: '.35rem', alignItems: 'center', fontSize: '.85rem' }}>
+                    <input type="checkbox" checked={active.has(a.alias)} onChange={() => toggle(a.alias)} />{a.name}
+                  </label>
+                ))}
+              </div>}
+        </Section>
+      );
+    }
+
+    function ClientRoles({ user }) {
+      const [clients, setClients] = useState(null);
+      const [sel, setSel] = useState('');
+      const [roles, setRoles] = useState(null);
+      const [assigned, setAssigned] = useState(new Set());
+      const [err, setErr] = useState(null);
+      const selectClient = async (cid) => {
+        setSel(cid); setRoles(null);
+        const [rr, mr] = await Promise.all([
+          adminFetch(`/clients/${cid}/roles`),
+          adminFetch(`/users/${user.id}/role-mappings/clients/${cid}`),
+        ]);
+        setRoles(rr.ok ? (await rr.json()).sort((a, b) => a.name.localeCompare(b.name)) : []);
+        setAssigned(new Set(mr.ok ? (await mr.json()).map((x) => x.name) : []));
+      };
+      useEffect(() => { (async () => {
+        const r = await adminFetch('/clients');
+        if (r.status === 403) { setErr("Need the 'view-clients' role to manage client roles."); return; }
+        const cs = (await r.json()).filter((c) => c.clientId).sort((a, b) => a.clientId.localeCompare(b.clientId));
+        setClients(cs);
+        const def = cs.find((c) => c.clientId === 'realm-management') || cs[0];
+        if (def) selectClient(def.id);
+      })(); }, [user.id]);
+      const toggle = async (role) => {
+        const has = assigned.has(role.name);
+        const res = await adminFetch(`/users/${user.id}/role-mappings/clients/${sel}`, {
+          method: has ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([{ id: role.id, name: role.name }]) });
+        if (res.status === 204) { const n = new Set(assigned); has ? n.delete(role.name) : n.add(role.name); setAssigned(n); setErr(null); }
+        else setErr(`Failed (HTTP ${res.status}).`);
+      };
+      return (
+        <Section title="Client roles">
+          {err && <div style={{ fontSize: '.82rem', color: 'var(--err-text)' }}>{err}</div>}
+          {clients && (
+            <select className="inp" value={sel} onChange={(e) => selectClient(e.target.value)} style={{ marginBottom: '.5rem' }}>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.clientId}</option>)}
+            </select>
+          )}
+          {roles && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem .9rem' }}>
+              {roles.length === 0 ? <span className="muted" style={{ fontSize: '.82rem' }}>(no roles on this client)</span>
+                : roles.map((r) => (
+                  <label key={r.id} style={{ display: 'flex', gap: '.35rem', alignItems: 'center', fontSize: '.85rem' }}>
+                    <input type="checkbox" checked={assigned.has(r.name)} onChange={() => toggle(r)} />{r.name}
+                  </label>
+                ))}
+            </div>
+          )}
+        </Section>
+      );
+    }
+
+    function UserSessions({ user }) {
+      const [sessions, setSessions] = useState(null);
+      const [msg, setMsg] = useState(null);
+      const load = async () => {
+        const r = await adminFetch(`/users/${user.id}/sessions`);
+        setSessions(r.ok ? await r.json() : []);
+      };
+      useEffect(() => { load(); }, [user.id]);
+      const logoutAll = async () => {
+        const r = await adminFetch(`/users/${user.id}/logout`, { method: 'POST' });
+        setMsg(r.ok || r.status === 204 ? 'Logged out all sessions.' : `Failed (HTTP ${r.status}).`);
+        load();
+      };
+      const fmt = (ms) => { const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(new Date(ms).toISOString()); return m ? `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}` : ''; };
+      return (
+        <Section title="Active sessions">
+          {!sessions ? <span className="muted" style={{ fontSize: '.82rem' }}>loading…</span>
+            : sessions.length === 0 ? <span className="muted" style={{ fontSize: '.82rem' }}>No active sessions.</span>
+            : <table>
+                <thead><tr><th>Clients</th><th>IP</th><th>Started</th></tr></thead>
+                <tbody>{sessions.map((s) => (
+                  <tr key={s.id}>
+                    <td>{Object.values(s.clients || {}).join(', ') || '—'}</td>
+                    <td style={{ fontFamily: 'monospace' }}>{s.ipAddress || '—'}</td>
+                    <td>{fmt(s.start)}</td>
+                  </tr>))}</tbody>
+              </table>}
+          <div className="row" style={{ marginTop: '.5rem' }}>
+            <button className="danger" type="button" disabled={!sessions || sessions.length === 0} onClick={logoutAll}>
+              Log out all sessions</button>
+          </div>
+          {msg && <div style={{ fontSize: '.82rem', color: 'var(--ok)', marginTop: '.4rem' }}>{msg}</div>}
+        </Section>
       );
     }
 
