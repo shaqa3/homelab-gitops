@@ -81,6 +81,7 @@
     .newform { margin-top: 1rem; display: grid; gap: .6rem; grid-template-columns: 1fr 1fr;
                background: var(--form-bg); padding: 1rem; border-radius: 10px; }
     .theme-btn { padding: .35rem .7rem; font-size: .85rem; }
+    .rowbtn { padding: .25rem .6rem; font-size: .78rem; font-weight: 500; }
   </style>
 
   <!-- React (UMD globals) + Babel for in-browser JSX -->
@@ -207,6 +208,7 @@
     function Users() {
       const [state, setState] = useState({ loading: true, users: null, error: null });
       const [showForm, setShowForm] = useState(false);
+      const [editing, setEditing] = useState(null);   // user being edited, or null
 
       const load = async () => {
         setState({ loading: true, users: null, error: null });
@@ -237,7 +239,7 @@
           {state.error && <div className="err">{state.error}</div>}
           {state.users && (
             <table>
-              <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Source</th><th>Status</th></tr></thead>
+              <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Source</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {state.users.map((u) => (
                   <tr key={u.id}>
@@ -247,6 +249,8 @@
                     <td><span className={'tag ' + (u.federationLink ? 'fed' : 'local')}>
                       {u.federationLink ? 'LDAP' : 'local'}</span></td>
                     <td>{u.enabled ? 'enabled' : 'disabled'}</td>
+                    <td><button className="ghost rowbtn"
+                      onClick={() => { setShowForm(false); setEditing(u); }}>Edit</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -254,11 +258,14 @@
           )}
           <div className="row">
             <button className="ghost" onClick={load}>Refresh</button>
-            <button className="primary" onClick={() => setShowForm((s) => !s)}>
+            <button className="primary" onClick={() => { setEditing(null); setShowForm((s) => !s); }}>
               {showForm ? 'Cancel' : '+ New user'}
             </button>
           </div>
           {showForm && <CreateUser onDone={() => { setShowForm(false); load(); }} />}
+          {editing && <EditUser user={editing}
+            onDone={() => { setEditing(null); load(); }}
+            onCancel={() => setEditing(null)} />}
         </div>
       );
     }
@@ -318,6 +325,71 @@
             <button className="primary" type="submit" disabled={busy}>
               {busy ? 'Creating…' : 'Create user'}
             </button>
+          </div>
+        </form>
+      );
+    }
+
+    function EditUser({ user, onDone, onCancel }) {
+      const [form, setForm] = useState({
+        firstName: user.firstName || '', lastName: user.lastName || '',
+        email: user.email || '', enabled: !!user.enabled,
+      });
+      const [msg, setMsg] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+      const submit = async (e) => {
+        e.preventDefault();
+        setBusy(true); setMsg(null);
+        try {
+          const res = await adminFetch(`/users/${user.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              firstName: form.firstName || null,
+              lastName: form.lastName || null,
+              email: form.email || null,
+              enabled: form.enabled,
+            }),
+          });
+          if (res.status === 204) {
+            setMsg({ ok: true, text: 'Saved (also written to LDAP for federated users).' });
+            setTimeout(onDone, 800);
+          } else if (res.status === 403) {
+            setMsg({ ok: false, text: "You don't have the 'manage-users' permission." });
+          } else {
+            const t = await res.text();
+            setMsg({ ok: false, text: `HTTP ${res.status}: ${t.slice(0, 160)}` });
+          }
+        } catch (e) {
+          setMsg({ ok: false, text: e.message });
+        } finally { setBusy(false); }
+      };
+
+      return (
+        <form onSubmit={submit} className="newform">
+          <div style={{ gridColumn: '1 / -1', fontWeight: 600 }}>
+            Edit <code>{user.username}</code>
+            <span className={'tag ' + (user.federationLink ? 'fed' : 'local')}
+              style={{ marginLeft: '.5rem' }}>{user.federationLink ? 'LDAP' : 'local'}</span>
+          </div>
+          <input className="inp" placeholder="first name" value={form.firstName} onChange={set('firstName')} />
+          <input className="inp" placeholder="last name" value={form.lastName} onChange={set('lastName')} />
+          <input className="inp" style={{ gridColumn: '1 / -1' }} placeholder="email" type="email" value={form.email} onChange={set('email')} />
+          <label style={{ gridColumn: '1 / -1', display: 'flex', gap: '.5rem', alignItems: 'center',
+            fontSize: '.9rem', color: 'var(--muted)' }}>
+            <input type="checkbox" checked={form.enabled}
+              onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} />
+            Account enabled
+          </label>
+          {msg && <div style={{ gridColumn: '1 / -1', fontSize: '.85rem',
+            color: msg.ok ? 'var(--ok)' : 'var(--err-text)' }}>{msg.text}</div>}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '.5rem' }}>
+            <button className="primary" type="submit" disabled={busy}>
+              {busy ? 'Saving…' : 'Save changes'}
+            </button>
+            <button className="ghost" type="button" onClick={onCancel}>Cancel</button>
           </div>
         </form>
       );
