@@ -183,11 +183,22 @@ provider name is resolved from `federationLink` via
 
 ## Groups tab
 
-Lists the realm's groups (`GET /groups`) and each group's members
-(`/groups/{id}/members`). The groups are **federated from OpenLDAP** via a
-`group-ldap-mapper` (`ou=groups`, `groupOfNames`), so it's **read-only** here —
-membership is managed in LDAP. Needs `query-groups`/`view-users` (covered by the
-demo users' grants).
+Lists the realm's groups (`GET /groups`), each group's members
+(`/groups/{id}/members`), and its assigned realm roles
+(`/groups/{id}/role-mappings/realm`). The groups are **federated from OpenLDAP**
+via a `group-ldap-mapper` (`ou=groups`, `groupOfNames`), so **membership is
+read-only** (managed in LDAP).
+
+**Group-based role mapping:** roles assigned to a group are **inherited by all its
+members** (visible in a user's *composite* role mappings). The **Edit roles**
+button per group toggles its realm roles (`POST`/`DELETE`
+`/groups/{id}/role-mappings/realm`). Demo: the `developers` group has `viewer`, so
+`asmith` — with no direct roles — effectively has `viewer` through membership.
+
+> Group role mappings are stored in Keycloak (not LDAP), so they're editable here
+> even though the groups themselves are read-only/federated. Like per-user grants,
+> they're imperative state (not in the realm import), since the groups come from
+> LDAP rather than the realm JSON.
 
 ## LDAP tab (federation settings)
 
