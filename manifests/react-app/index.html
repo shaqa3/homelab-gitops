@@ -167,11 +167,14 @@
           <nav>
             <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Profile</button>
             <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Users</button>
+            <button className={tab === 'ldap' ? 'active' : ''} onClick={() => setTab('ldap')}>LDAP</button>
             <span style={{ marginLeft: 'auto' }} />
             <ThemeToggle />
             <button className="ghost" onClick={() => keycloak.logout()}>Log out</button>
           </nav>
-          {tab === 'profile' ? <Profile profile={profile} /> : <Users />}
+          {tab === 'profile' ? <Profile profile={profile} />
+            : tab === 'users' ? <Users />
+            : <LdapSettings />}
         </Card>
       );
     }
@@ -528,6 +531,63 @@
             <button className="danger" type="button" onClick={del} disabled={busy}>Delete user</button>
           </div>
         </form>
+      );
+    }
+
+    function LdapSettings() {
+      const [state, setState] = useState({ loading: true, prov: null, error: null });
+      useEffect(() => {
+        (async () => {
+          try {
+            const res = await adminFetch('/components?type=org.keycloak.storage.UserStorageProvider');
+            if (res.status === 403) { setState({ loading: false, prov: null, error: "Need the 'view-realm' role to read federation settings." }); return; }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const list = await res.json();
+            const prov = list.find((c) => c.providerId === 'ldap') || list[0] || null;
+            setState({ loading: false, prov, error: null });
+          } catch (e) { setState({ loading: false, prov: null, error: e.message }); }
+        })();
+      }, []);
+
+      if (state.loading) return <div><h1>LDAP federation</h1><p className="muted">Loading…</p></div>;
+      if (state.error)   return <div><h1>LDAP federation</h1><div className="err">{state.error}</div></div>;
+      if (!state.prov)   return <div><h1>LDAP federation</h1><p className="muted">No LDAP provider configured.</p></div>;
+
+      const c = state.prov.config;
+      const g = (k) => (c[k] && c[k][0] != null ? c[k][0] : '—');
+      const scope = { '1': 'One Level', '2': 'Subtree' }[g('searchScope')] || g('searchScope');
+      const rows = [
+        ['Provider name', state.prov.name],
+        ['Vendor', g('vendor')],
+        ['Enabled', g('enabled')],
+        ['Connection URL', g('connectionUrl')],
+        ['Bind DN', g('bindDn')],
+        ['Bind credential', '•••••••• (write-only)'],
+        ['Users DN', g('usersDn')],
+        ['Edit mode', g('editMode')],
+        ['Search scope', scope],
+        ['Username attribute', g('usernameLDAPAttribute')],
+        ['RDN attribute', g('rdnLDAPAttribute')],
+        ['UUID attribute', g('uuidLDAPAttribute')],
+        ['User object classes', g('userObjectClasses')],
+        ['Import users', g('importEnabled')],
+        ['Sync registrations', g('syncRegistrations')],
+        ['Pagination', g('pagination')],
+      ];
+      return (
+        <div>
+          <h1>LDAP federation <span className="muted" style={{ fontSize: '.9rem', fontWeight: 400 }}>
+            ({state.prov.name})</span></h1>
+          <p className="muted">Read-only view of the realm's LDAP user-storage provider config.</p>
+          <div className="kv" style={{ gridTemplateColumns: 'auto 1fr' }}>
+            {rows.map(([k, v]) => (
+              <React.Fragment key={k}>
+                <b>{k}</b><span style={{ fontFamily: /URL|DN|attribute|object/.test(k) ? 'monospace' : 'inherit',
+                  wordBreak: 'break-all' }}>{v}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
       );
     }
 
