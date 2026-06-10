@@ -226,6 +226,18 @@ table showing how LDAP attributes map to Keycloak — e.g. `uid → username`,
 `mail → email`, `cn → firstName`, `sn → lastName` (this is also why a seeded
 `cn: John Doe` shows as first name "John Doe").
 
+## Clients & Events tabs
+
+- **Clients** — read-only list of the realm's OIDC/SAML clients (`GET /clients`,
+  needs `view-clients`): client ID, public/confidential, enabled flows, status.
+- **Events** — recent login events (`GET /events`, needs `view-events`): time,
+  type (LOGIN / LOGIN_ERROR), user, client, IP. Events are enabled on the realm
+  (in the realm import).
+
+> Reading events requires Keycloak **26.6.x** — 26.3.x had an NPE in the
+> fine-grained-admin-permissions + LDAP-group path that broke admin API calls for
+> federated users in groups. The `Keycloak` CR pins the server image to 26.6.3.
+
 ## Upgrade to a real Vite project (optional)
 
 This CDN/Babel setup is for zero-install simplicity (no Node needed). For a

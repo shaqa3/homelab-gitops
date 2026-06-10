@@ -6,11 +6,15 @@ pattern. One root Application watches `apps/` and creates the child Applications
 ```
 gitops/
 ├── bootstrap/
-│   └── root-app.yaml          # app-of-apps root (apply this once)
+│   ├── root-app.yaml          # app-of-apps root (apply this once)
+│   └── bootstrap.sh           # reproduces imperative state (TLS, LDAP seed, grants)
 ├── apps/                      # child ArgoCD Applications (watched by root)
 │   ├── openldap.yaml          # Helm chart (external repo) + values from this repo
 │   ├── phpldapadmin.yaml      # -> manifests/phpldapadmin
-│   ├── keycloak.yaml          # -> manifests/keycloak
+│   ├── keycloak.yaml          # -> manifests/keycloak (ingress only)
+│   ├── keycloak-operator.yaml # -> manifests/keycloak-operator
+│   ├── keycloak-cr.yaml       # -> manifests/keycloak-cr
+│   ├── metrics-server.yaml    # -> manifests/metrics-server
 │   └── react-app.yaml         # -> manifests/react-app
 ├── manifests/
 │   ├── openldap/             # values.yaml for the Helm chart (no raw objects)
@@ -37,6 +41,7 @@ Full walkthroughs in [`docs/`](docs/):
 - [keycloak-minikube-guide.md](docs/keycloak-minikube-guide.md) — install Keycloak
 - [keycloak-openldap-federation-guide.md](docs/keycloak-openldap-federation-guide.md) — federate Keycloak to OpenLDAP (+ `keycloak-ldap-federation.sh`)
 - [argocd-gitops-guide.md](docs/argocd-gitops-guide.md) — this GitOps setup, adoption, and the `imagePullSecrets` gotcha
+- [rebuild-runbook.md](docs/rebuild-runbook.md) — recreate the whole lab from scratch (Git + `bootstrap.sh`)
 
 ## Scope
 
