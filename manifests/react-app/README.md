@@ -151,6 +151,16 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 > Realm roles live in Keycloak only — they are **not** written to LDAP (LDAP
 > stores identity/credentials; authorization stays in Keycloak).
 
+### LDAP directory entry
+
+For a federated user, the Edit panel shows a read-only **LDAP directory entry**
+box: the federation provider name, the **DN**, the **entryUUID**, and the LDAP
+create/modify timestamps. These come from the *full* user representation
+(`GET /users/{id}`, which includes `attributes` — `LDAP_ENTRY_DN`, `LDAP_ID`,
+`createTimestamp`, `modifyTimestamp`) that the brief list response omits; the
+provider name is resolved from `federationLink` via
+`/components?type=…UserStorageProvider` (needs `view-realm`).
+
 > The browser can call the admin API because the `react-app` client's **Web
 > origins** include the app's origin, so the access token carries an
 > `allowed-origins` claim and Keycloak returns CORS headers for it.
