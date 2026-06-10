@@ -542,6 +542,7 @@
 
     function Groups() {
       const [state, setState] = useState({ loading: true, groups: null, error: null });
+      const [editing, setEditing] = useState(null);
       const load = async () => {
         setState({ loading: true, groups: null, error: null });
         try {
@@ -549,12 +550,16 @@
           if (res.status === 403) { setState({ loading: false, groups: null, error: "Need 'query-groups'/'view-users' to list groups." }); return; }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const groups = await res.json();
-          // fetch members per group (small N)
+          // members + role mappings per group (small N)
           await Promise.all(groups.map(async (g) => {
             try {
               const m = await adminFetch(`/groups/${g.id}/members?briefRepresentation=true`);
               g.members = m.ok ? (await m.json()).map((u) => u.username) : [];
             } catch { g.members = []; }
+            try {
+              const r = await adminFetch(`/groups/${g.id}/role-mappings/realm`);
+              g.roles = r.ok ? (await r.json()).map((x) => x.name).filter((n) => n !== 'default-roles-demo').sort() : null;
+            } catch { g.roles = null; }
           }));
           groups.sort((a, b) => a.name.localeCompare(b.name));
           setState({ loading: false, groups, error: null });
@@ -566,29 +571,77 @@
         <div>
           <h1>Groups <span className="muted" style={{ fontSize: '.9rem', fontWeight: 400 }}>
             in realm <code>demo</code></span></h1>
-          <p className="muted">Federated from OpenLDAP (<code>ou=groups</code>, <code>groupOfNames</code>).
-            Membership is read-only here — it's managed in LDAP.</p>
+          <p className="muted">Federated from OpenLDAP (<code>ou=groups</code>). Membership is
+            read-only (managed in LDAP); <b>roles assigned to a group are inherited by its
+            members</b> and are managed in Keycloak.</p>
           {state.loading && <p className="muted">Loading…</p>}
           {state.error && <div className="err">{state.error}</div>}
           {state.groups && (state.groups.length === 0
             ? <p className="muted">No groups.</p>
             : <table>
-                <thead><tr><th>Group</th><th>Path</th><th>Members</th></tr></thead>
+                <thead><tr><th>Group</th><th>Members</th><th>Roles (inherited by members)</th><th></th></tr></thead>
                 <tbody>
                   {state.groups.map((g) => (
                     <tr key={g.id}>
                       <td>{g.name}</td>
-                      <td style={{ fontFamily: 'monospace' }}>{g.path}</td>
                       <td>{g.members && g.members.length
                         ? <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '.25rem' }}>
-                            {g.members.map((u) => <span key={u} className="tag role">{u}</span>)}</span>
+                            {g.members.map((u) => <span key={u} className="tag fed">{u}</span>)}</span>
                         : <span className="muted">—</span>}</td>
+                      <td>{g.roles && g.roles.length
+                        ? <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '.25rem' }}>
+                            {g.roles.map((r) => <span key={r} className="tag role">{r}</span>)}</span>
+                        : <span className="muted">—</span>}</td>
+                      <td><button className="ghost rowbtn"
+                        onClick={() => setEditing(g)}>Edit roles</button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>)}
           <div className="row"><button className="ghost" onClick={load}>Refresh</button></div>
+          {editing && <GroupRoles group={editing}
+            onDone={() => { setEditing(null); load(); }} />}
         </div>
+      );
+    }
+
+    function GroupRoles({ group, onDone }) {
+      const [roles, setRoles] = useState(null);
+      const [assigned, setAssigned] = useState(new Set());
+      const [err, setErr] = useState(null);
+      useEffect(() => { (async () => {
+        try {
+          const [ar, mr] = await Promise.all([
+            adminFetch('/roles'),
+            adminFetch(`/groups/${group.id}/role-mappings/realm`),
+          ]);
+          if (ar.status === 403) { setErr("Need the 'view-realm' role."); return; }
+          setRoles((await ar.json()).filter((r) => r.name !== 'default-roles-demo').sort((a, b) => a.name.localeCompare(b.name)));
+          setAssigned(new Set(mr.ok ? (await mr.json()).map((x) => x.name) : []));
+        } catch (e) { setErr(e.message); }
+      })(); }, [group.id]);
+      const toggle = async (role) => {
+        const has = assigned.has(role.name);
+        const res = await adminFetch(`/groups/${group.id}/role-mappings/realm`, {
+          method: has ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([{ id: role.id, name: role.name }]) });
+        if (res.status === 204) { const n = new Set(assigned); has ? n.delete(role.name) : n.add(role.name); setAssigned(n); setErr(null); }
+        else setErr(`Failed (HTTP ${res.status}).`);
+      };
+      return (
+        <form className="newform" onSubmit={(e) => { e.preventDefault(); onDone(); }}>
+          <div style={{ gridColumn: '1 / -1', fontWeight: 600 }}>Realm roles for group <code>{group.name}</code></div>
+          {err && <div style={{ gridColumn: '1 / -1', fontSize: '.82rem', color: 'var(--err-text)' }}>{err}</div>}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: '.4rem .9rem' }}>
+            {!roles ? <span className="muted" style={{ fontSize: '.82rem' }}>loading…</span>
+              : roles.map((r) => (
+                <label key={r.id} style={{ display: 'flex', gap: '.35rem', alignItems: 'center', fontSize: '.85rem' }}>
+                  <input type="checkbox" checked={assigned.has(r.name)} onChange={() => toggle(r)} />{r.name}
+                </label>
+              ))}
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}><button className="primary" type="submit">Done</button></div>
+        </form>
       );
     }
 
