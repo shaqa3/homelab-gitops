@@ -343,6 +343,41 @@
       const [busy, setBusy] = useState(false);
       const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+      // ---- realm roles ----
+      const [roles, setRoles] = useState(null);          // available realm roles
+      const [assigned, setAssigned] = useState(new Set()); // names assigned to user
+      const [roleErr, setRoleErr] = useState(null);
+      useEffect(() => {
+        (async () => {
+          try {
+            const [allRes, mineRes] = await Promise.all([
+              adminFetch('/roles'),
+              adminFetch(`/users/${user.id}/role-mappings/realm`),
+            ]);
+            if (allRes.status === 403) { setRoleErr("Need the 'view-realm' role to manage roles."); return; }
+            const all = (await allRes.json()).filter((r) => r.name !== 'default-roles-demo');
+            all.sort((a, b) => a.name.localeCompare(b.name));
+            const mine = mineRes.ok ? await mineRes.json() : [];
+            setRoles(all);
+            setAssigned(new Set(mine.map((r) => r.name)));
+          } catch (e) { setRoleErr(e.message); }
+        })();
+      }, [user.id]);
+
+      const toggleRole = async (role) => {
+        const has = assigned.has(role.name);
+        try {
+          const res = await adminFetch(`/users/${user.id}/role-mappings/realm`, {
+            method: has ? 'DELETE' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify([{ id: role.id, name: role.name }]),
+          });
+          if (res.status !== 204) { setRoleErr(`Role change failed (HTTP ${res.status}).`); return; }
+          setAssigned((prev) => { const n = new Set(prev); has ? n.delete(role.name) : n.add(role.name); return n; });
+          setRoleErr(null);
+        } catch (e) { setRoleErr(e.message); }
+      };
+
       const submit = async (e) => {
         e.preventDefault();
         setBusy(true); setMsg(null);
@@ -406,6 +441,24 @@
               onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} />
             Account enabled
           </label>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div className="muted" style={{ fontSize: '.82rem', marginBottom: '.4rem' }}>
+              Realm roles <span style={{ opacity: .7 }}>(changes apply immediately)</span>
+            </div>
+            {roleErr && <div style={{ fontSize: '.82rem', color: 'var(--err-text)' }}>{roleErr}</div>}
+            {!roles && !roleErr && <span className="muted" style={{ fontSize: '.82rem' }}>loading roles…</span>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem .9rem' }}>
+              {roles && roles.map((r) => (
+                <label key={r.id} title={r.description || ''}
+                  style={{ display: 'flex', gap: '.35rem', alignItems: 'center', fontSize: '.85rem' }}>
+                  <input type="checkbox" checked={assigned.has(r.name)} onChange={() => toggleRole(r)} />
+                  {r.name}
+                </label>
+              ))}
+            </div>
+          </div>
+
           {msg && <div style={{ gridColumn: '1 / -1', fontSize: '.85rem',
             color: msg.ok ? 'var(--ok)' : 'var(--err-text)' }}>{msg.text}</div>}
           <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '.5rem', alignItems: 'center' }}>
