@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+
+# Generate the ConfigMap from the real index.html file. Kustomize appends a
+# content hash to the name and rewrites the Deployment's configMap reference, so
+# editing index.html rolls the Deployment automatically.
+configMapGenerator:
+  - name: react-app-html
+    files:
+      - index.html
+
+# Keep the generated ConfigMap name stable-with-hash (default behaviour).
+generatorOptions:
+  disableNameSuffixHash: false
