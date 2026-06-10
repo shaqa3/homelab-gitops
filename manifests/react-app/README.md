@@ -165,6 +165,15 @@ provider name is resolved from `federationLink` via
 > origins** include the app's origin, so the access token carries an
 > `allowed-origins` claim and Keycloak returns CORS headers for it.
 
+## LDAP tab (federation settings)
+
+The **LDAP** nav tab shows a read-only view of the realm's LDAP user-storage
+provider config — connection URL, bind DN, users DN, edit mode, search scope,
+the attribute mappings (username/RDN/UUID), object classes, and the
+import/sync/pagination flags. This is realm-level config (not per-user), read
+from `/components?type=…UserStorageProvider` (needs `view-realm`). The bind
+credential is write-only and never returned by Keycloak.
+
 ## Upgrade to a real Vite project (optional)
 
 This CDN/Babel setup is for zero-install simplicity (no Node needed). For a
