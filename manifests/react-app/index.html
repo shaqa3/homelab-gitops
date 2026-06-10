@@ -170,6 +170,8 @@
             <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>Profile</button>
             <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Users</button>
             <button className={tab === 'groups' ? 'active' : ''} onClick={() => setTab('groups')}>Groups</button>
+            <button className={tab === 'clients' ? 'active' : ''} onClick={() => setTab('clients')}>Clients</button>
+            <button className={tab === 'events' ? 'active' : ''} onClick={() => setTab('events')}>Events</button>
             <button className={tab === 'ldap' ? 'active' : ''} onClick={() => setTab('ldap')}>LDAP</button>
             <span style={{ marginLeft: 'auto' }} />
             <ThemeToggle />
@@ -178,6 +180,8 @@
           {tab === 'profile' ? <Profile profile={profile} />
             : tab === 'users' ? <Users />
             : tab === 'groups' ? <Groups />
+            : tab === 'clients' ? <Clients />
+            : tab === 'events' ? <Events />
             : <LdapSettings />}
         </Card>
       );
@@ -655,6 +659,77 @@
           </div>
           <div style={{ gridColumn: '1 / -1' }}><button className="primary" type="submit">Done</button></div>
         </form>
+      );
+    }
+
+    function Clients() {
+      const [state, setState] = useState({ loading: true, clients: null, error: null });
+      useEffect(() => { (async () => {
+        try {
+          const res = await adminFetch('/clients?max=100');
+          if (res.status === 403) { setState({ loading: false, clients: null, error: "Need 'view-clients' to list clients." }); return; }
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const clients = (await res.json()).sort((a, b) => (a.clientId || '').localeCompare(b.clientId || ''));
+          setState({ loading: false, clients, error: null });
+        } catch (e) { setState({ loading: false, clients: null, error: e.message }); }
+      })(); }, []);
+      const flow = (c) => [c.standardFlowEnabled && 'auth-code', c.directAccessGrantsEnabled && 'direct',
+        c.serviceAccountsEnabled && 'service-acct', c.implicitFlowEnabled && 'implicit'].filter(Boolean).join(', ') || '—';
+      return (
+        <div>
+          <h1>Clients <span className="muted" style={{ fontSize: '.9rem', fontWeight: 400 }}>in realm <code>demo</code></span></h1>
+          <p className="muted">OIDC/SAML clients (read-only).</p>
+          {state.loading && <p className="muted">Loading…</p>}
+          {state.error && <div className="err">{state.error}</div>}
+          {state.clients && <table>
+            <thead><tr><th>Client ID</th><th>Type</th><th>Flows</th><th>Enabled</th></tr></thead>
+            <tbody>{state.clients.map((c) => (
+              <tr key={c.id}>
+                <td>{c.clientId}</td>
+                <td><span className={'tag ' + (c.publicClient ? 'local' : 'fed')}>{c.publicClient ? 'public' : 'confidential'}</span></td>
+                <td style={{ fontSize: '.82rem' }}>{flow(c)}</td>
+                <td>{c.enabled ? 'enabled' : 'disabled'}</td>
+              </tr>))}</tbody>
+          </table>}
+        </div>
+      );
+    }
+
+    function Events() {
+      const [state, setState] = useState({ loading: true, events: null, error: null });
+      const load = async () => {
+        setState({ loading: true, events: null, error: null });
+        try {
+          const res = await adminFetch('/events?max=50');
+          if (res.status === 403) { setState({ loading: false, events: null, error: "Need 'view-events' to read events." }); return; }
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          setState({ loading: false, events: await res.json(), error: null });
+        } catch (e) { setState({ loading: false, events: null, error: e.message }); }
+      };
+      useEffect(() => { load(); }, []);
+      const fmt = (ms) => { const m = /T(\d{2}:\d{2}:\d{2})/.exec(new Date(ms).toISOString()); const d = new Date(ms).toISOString().slice(0, 10); return m ? `${d} ${m[1]}` : ''; };
+      return (
+        <div>
+          <h1>Events <span className="muted" style={{ fontSize: '.9rem', fontWeight: 400 }}>(login) in realm <code>demo</code></span></h1>
+          <p className="muted">Recent authentication events from Keycloak.</p>
+          {state.loading && <p className="muted">Loading…</p>}
+          {state.error && <div className="err">{state.error}</div>}
+          {state.events && (state.events.length === 0
+            ? <p className="muted">No events (try logging in).</p>
+            : <table>
+                <thead><tr><th>Time (UTC)</th><th>Type</th><th>User</th><th>Client</th><th>IP</th></tr></thead>
+                <tbody>{state.events.map((e, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: 'monospace', fontSize: '.8rem' }}>{fmt(e.time)}</td>
+                    <td><span className={'tag ' + (e.type && e.type.includes('ERROR') ? 'local' : 'role')}>{e.type}</span>
+                      {e.error ? <span className="muted" style={{ fontSize: '.75rem' }}> {e.error}</span> : null}</td>
+                    <td>{(e.details && e.details.username) || e.userId || '—'}</td>
+                    <td>{e.clientId || '—'}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '.8rem' }}>{e.ipAddress || '—'}</td>
+                  </tr>))}</tbody>
+              </table>)}
+          <div className="row"><button className="ghost" onClick={load}>Refresh</button></div>
+        </div>
       );
     }
 
