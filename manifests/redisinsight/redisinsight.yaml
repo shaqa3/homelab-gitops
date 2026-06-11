@@ -38,8 +38,12 @@ spec:
               value: "redis"          # redis.redis.svc, same namespace
             - name: RI_REDIS_PORT
               value: "6379"
+            - name: RI_REDIS_DB
+              value: "0"
             - name: RI_REDIS_ALIAS
               value: "homelab-redis"
+            - name: RI_REDIS_USERNAME
+              value: "default"        # required for the preconfigure to register
             - name: RI_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
