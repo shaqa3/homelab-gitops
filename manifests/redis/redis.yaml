@@ -37,9 +37,17 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
+          # requirepass is read from the env var (sealed via redis-auth) at
+          # startup; AOF persistence keeps data across restarts.
+          command: ["sh", "-c"]
           args:
-            - "--appendonly"
-            - "yes"           # AOF persistence so data survives restarts
+            - exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth
+                  key: redis-password
           ports:
             - name: redis
               containerPort: 6379
@@ -50,7 +58,10 @@ spec:
             periodSeconds: 15
           readinessProbe:
             exec:
-              command: ["redis-cli", "ping"]
+              command:
+                - sh
+                - -c
+                - redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
