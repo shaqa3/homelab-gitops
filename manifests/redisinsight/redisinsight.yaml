@@ -24,6 +24,14 @@ spec:
               value: "0.0.0.0"
             - name: RI_APP_PORT
               value: "5540"
+            # Required so RedisInsight can encrypt+store the preconfigured
+            # database password: the container has no libsecret/keytar, so
+            # without this the auto-added connection silently fails to persist.
+            - name: RI_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: redisinsight-secrets
+                  key: encryption-key
             # Pre-add the homelab Redis as a database on startup so the GUI
             # opens already connected (no manual setup, no saved-state needed).
             - name: RI_REDIS_HOST
