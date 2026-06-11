@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redisinsight
+  namespace: redis
+  labels:
+    app: redisinsight
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redisinsight
+  template:
+    metadata:
+      labels:
+        app: redisinsight
+    spec:
+      containers:
+        - name: redisinsight
+          image: redis/redisinsight:3.4.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: RI_APP_HOST
+              value: "0.0.0.0"
+            - name: RI_APP_PORT
+              value: "5540"
+            # Pre-add the homelab Redis as a database on startup so the GUI
+            # opens already connected (no manual setup, no saved-state needed).
+            - name: RI_REDIS_HOST
+              value: "redis"          # redis.redis.svc, same namespace
+            - name: RI_REDIS_PORT
+              value: "6379"
+            - name: RI_REDIS_ALIAS
+              value: "homelab-redis"
+            - name: RI_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth     # sealed; same secret redis-server uses
+                  key: redis-password
+          ports:
+            - name: http
+              containerPort: 5540
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        # Ephemeral: the connection re-adds itself from env on every start,
+        # so there is no state worth persisting.
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redisinsight
+  namespace: redis
+  labels:
+    app: redisinsight
+spec:
+  type: ClusterIP
+  selector:
+    app: redisinsight
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5540
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: redisinsight
+  namespace: redis
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - redisinsight.192.168.64.3.nip.io
+      secretName: homelab-tls   # cert-manager leaf cert (see cert-manager-issuers)
+  rules:
+    - host: redisinsight.192.168.64.3.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: redisinsight
+                port:
+                  number: 80
